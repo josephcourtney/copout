@@ -58,19 +58,19 @@ def cli(
 
 @app.command("doctor")
 def doctor_command() -> None:
-    """Diagnose Atuin history/output integration."""
+    """Diagnose Atuin history and Jerakeen daemon integration."""
     raise typer.Exit(doctor.doctor())
 
 
 @app.command("verify")
 def verify_command() -> None:
-    """Verify that Atuin history and command-output capture work."""
+    """Verify that Atuin history and Jerakeen command-output capture work."""
     raise typer.Exit(doctor.verify())
 
 
 @app.command("install")
 def install_command() -> None:
-    """Configure Atuin daemon and pty-proxy for Copout."""
+    """Configure the Atuin daemon and pty-proxy used through Jerakeen."""
     try:
         result = installer.install()
     except RuntimeError as exc:

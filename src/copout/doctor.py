@@ -4,8 +4,7 @@ import os
 import shutil
 import subprocess
 
-from .atuin import AtuinError, recent_entries
-from .atuin_mcp import MCPClient, find_tool
+from .atuin import AtuinError, daemon_info, recent_entries
 
 
 def _command(args: list[str]) -> tuple[int, str]:
@@ -23,6 +22,7 @@ def doctor() -> int:
     if not atuin_path:
         print("\ndiagnosis:\n  FAIL: Atuin is a required dependency and is not on PATH.")
         return 2
+
     code, version = _command([atuin_path, "--version"])
     print(f"  atuin version:    {version if code == 0 else 'unavailable'}")
     session = os.environ.get("ATUIN_SESSION", "")
@@ -33,43 +33,55 @@ def doctor() -> int:
         for line in daemon.splitlines():
             print(f"    {line}")
 
+    daemon_available = False
     try:
-        with MCPClient() as client:
-            tools = client.tools()
-            history_tool = find_tool(tools, "history")
-            output_tool = find_tool(tools, "output")
-            print(f"  history tool:     {'yes' if history_tool else 'NO'}")
-            print(f"  output tool:      {'yes' if output_tool else 'NO'}")
-        entries = recent_entries(1)
+        info = daemon_info()
+    except AtuinError as exc:
+        print("  jerakeen daemon:  NO")
+        print(f"    {exc}")
+    else:
+        daemon_available = info.healthy
+        print(f"  jerakeen daemon:  {'yes' if info.healthy else 'UNHEALTHY'}")
+        print(f"    target:          {info.description}")
+        print(f"    atuin:           {info.version}")
+        print(f"    protocol:        {info.protocol}")
+        print(f"    pid:             {info.pid}")
+
+    if not session:
+        print("\ndiagnosis:")
+        print("  FAIL: ATUIN_SESSION is not set in this shell.")
+        print("  Ensure normal `atuin init` shell integration is loaded, then open a new shell.")
+        return 4
+
+    try:
+        entries = recent_entries(1, include_output=daemon_available)
     except AtuinError as exc:
         print(f"\ndiagnosis:\n  FAIL: {exc}")
         return 3
 
     if not entries:
         print("\ndiagnosis:")
-        if not session:
-            print("  FAIL: ATUIN_SESSION is not set in this shell.")
-            print(
-                "  Ensure normal `atuin init` shell integration is loaded, then open a new shell."
-            )
-        else:
-            print("  FAIL: Atuin returned no matching history entries for this session.")
-            print(
-                "  The MCP connection is healthy; inspect `atuin search --filter-mode session` next."
-            )
+        print("  FAIL: Atuin returned no matching history entries for this session.")
+        print("  Inspect `atuin history list --session` next.")
         return 4
+
     latest = entries[0]
     print(f"  latest command:   {latest.command}")
     print(f"  latest status:    {latest.exit_status}")
     print(f"  captured output:  {'yes' if latest.output is not None else 'NO'}")
+
+    if not daemon_available:
+        print("\ndiagnosis:")
+        print("  PARTIAL: Atuin history works, but Jerakeen cannot reach the Atuin daemon.")
+        print("  Enable the Atuin daemon and pty-proxy, then start a new shell.")
+        return 5
     if latest.output is None:
         print("\ndiagnosis:")
         print("  PARTIAL: Atuin history works, but command output is unavailable.")
-        print("  Enable the Atuin daemon and pty-proxy, then start a new shell.")
+        print("  The daemon output cache is ephemeral; verify pty-proxy is active in this shell.")
         return 5
-    print(
-        "\ndiagnosis:\n  PASS: Atuin history and pty-proxy command output are available to Copout."
-    )
+
+    print("\ndiagnosis:\n  PASS: Atuin history and Jerakeen daemon output are available to Copout.")
     return 0
 
 

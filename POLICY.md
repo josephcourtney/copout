@@ -8,7 +8,9 @@ Atuin owns command history, command metadata, session identity, and recent PTY-c
 
 ## Compatibility
 
-Atuin is a hard dependency. Command-output capture requires an Atuin release that provides `pty-proxy`, the daemon, and the MCP `atuin_output` capability. Copout discovers MCP tool schemas at runtime so minor Atuin schema evolution can be tolerated where practical.
+Atuin is a hard dependency. Copout reads persisted chronological history through Atuin's documented `history list` CLI. Command-output capture requires an Atuin release that provides the daemon and `pty-proxy`; Copout reaches that daemon through Jerakeen's public Python API.
+
+Copout does not use Atuin's MCP server, private SQLite schema, or private daemon protocol, and it does not import Jerakeen's private protobuf modules.
 
 ## Privacy
 

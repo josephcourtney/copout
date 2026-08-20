@@ -1,84 +1,99 @@
 [project]
-name = "copout"
-version = "0.7.4"
-description = "Copy recent Atuin command history and captured terminal output as structured context."
-readme = "README.md"
-authors = [
-  { name = "Joseph M Courtney", email = "5942706+josephcourtney@users.noreply.github.com" },
-]
-urls = { Homepage = "https://github.com/josephcourtney/copout", "Bug Tracker" = "https://github.com/josephcourtney/copout/issues" }
-license = "GPL-3.0-only"
-license-files = ["LICENSE*"]
-requires-python = ">=3.13"
-classifiers = [
-  "Development Status :: 3 - Alpha",
-  "Intended Audience :: Developers",
-  "Operating System :: MacOS :: MacOS X",
-  "Operating System :: POSIX :: Linux",
-  "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.13",
-  "Programming Language :: Python :: 3.14",
-]
-dependencies = ["typer>=0.12"]
-
-[project.scripts]
-copout = "copout.cli:main"
+  name = "copout"
+  version = "0.7.4"
+  description = "Copy recent Atuin command history and captured terminal output as structured context."
+  readme = "README.md"
+  authors = [
+    { name = "Joseph M Courtney", email = "5942706+josephcourtney@users.noreply.github.com" },
+  ]
+  urls = { Homepage = "https://github.com/josephcourtney/copout", "Bug Tracker" = "https://github.com/josephcourtney/copout/issues" }
+  license = "GPL-3.0-only"
+  license-files = ["LICENSE*"]
+  requires-python = ">=3.13"
+  classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+  ]
+  dependencies = [
+    "typer>=0.12",
+    "jerakeen @ git+https://github.com/josephcourtney/jerakeen.git@4c32b3ae14a44d23729309124bd314c74c209d84",
+  ]
+  [project.scripts]
+    copout = "copout.cli:main"
 
 [dependency-groups]
-dev = [
-  "pytest>=9.1.0",
-  "pytest-cov>=7.1.0",
-  "ruff>=0.15.17",
-  "rust-just>=1.52.0",
-  "ty>=0.0.49",
-]
+  dev = [
+    "pytest>=9.1.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.17",
+    "rust-just>=1.52.0",
+    "ty>=0.0.49",
+  ]
 
 [build-system]
-requires = ["uv_build>=0.11,<0.12"]
-build-backend = "uv_build"
+  requires      = ["uv_build>=0.11,<0.12"]
+  build-backend = "uv_build"
 
 [tool.uv]
-default-groups = ["dev"]
+  default-groups = ["dev"]
 
 [tool.ruff]
-target-version = "py313"
-line-length = 100
+  target-version = "py313"
+  line-length    = 100
 
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "C4", "SIM", "N", "PLC", "PLE", "PLW", "RUF"]
-ignore = [
-  "E501",
-  "N802",
-  "PLC1901",
-  "RUF001",
-  "RUF002",
-  "RUF003",
-]
+  [tool.ruff.lint]
+    select = [
+      "E",
+      "F",
+      "I",
+      "UP",
+      "B",
+      "C4",
+      "SIM",
+      "N",
+      "PLC",
+      "PLE",
+      "PLW",
+      "RUF",
+    ]
+    ignore = [
+      "E501",
+      "N802",
+      "PLC1901",
+      "RUF001",
+      "RUF002",
+      "RUF003",
+    ]
 
-[tool.ruff.lint.extend-per-file-ignores]
-"tests/**/*.py" = ["E402"]
+    [tool.ruff.lint.extend-per-file-ignores]
+      "tests/**/*.py" = ["E402"]
 
 [tool.ty.src]
-include = ["src", "tests"]
+  include = ["src", "tests"]
 
 [tool.pytest.ini_options]
-minversion = "9.0"
-pythonpath = ["src"]
-testpaths = ["tests"]
-addopts = [
-  "--strict-markers",
-  "--strict-config",
-  "-ra",
-  "--import-mode=importlib",
-]
-xfail_strict = true
-markers = [
-  "unit: Fast isolated unit tests.",
-  "component: Subsystem tests using public APIs and local fakes.",
-  "regression: Regression coverage for a previously observed defect.",
-  "slow: Tests intentionally excluded from fast development loops.",
-]
+  minversion = "9.0"
+  pythonpath = ["src"]
+  testpaths = ["tests"]
+  addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+    "--import-mode=importlib",
+  ]
+  xfail_strict = true
+  markers = [
+    "unit: Fast isolated unit tests.",
+    "component: Subsystem tests using public APIs and local fakes.",
+    "regression: Regression coverage for a previously observed defect.",
+    "slow: Tests intentionally excluded from fast development loops.",
+  ]
 
 [tool.coverage.run]
-source = ["copout"]
-branch = true
+  source = ["copout"]
+  branch = true

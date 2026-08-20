@@ -27,7 +27,7 @@ def test_help_is_available_with_long_option() -> None:
 
 def test_atuin_failure_goes_to_stderr_and_returns_exit_3(monkeypatch) -> None:
     def fail() -> dict:
-        raise record.AtuinError("MCP unavailable")
+        raise record.AtuinError("history unavailable")
 
     monkeypatch.setattr(cli.record, "build_record", fail)
 
@@ -35,7 +35,7 @@ def test_atuin_failure_goes_to_stderr_and_returns_exit_3(monkeypatch) -> None:
 
     assert result.exit_code == 3
     assert result.stdout == ""
-    assert "copout: MCP unavailable" in result.stderr
+    assert "copout: history unavailable" in result.stderr
     assert "copout: run `copout doctor` for diagnostics" in result.stderr
 
 

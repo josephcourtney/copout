@@ -22,9 +22,10 @@
 
 ### Changed
 
-- Adapt Atuin MCP history calls to both singular `filter_mode` schemas and Atuin 18.19's required plural `filter_modes` schema.
+- Replace the Atuin MCP integration with Jerakeen for direct daemon status and command-output access.
+- Read chronological current-session history through Atuin's documented `history list` CLI because the daemon search service is command-deduplicated and history tailing is live-only.
+- Remove the custom MCP client and its MCP schema/parsing compatibility layer.
 - Rebuilt Copout around Atuin as a hard dependency and authoritative command-history source.
 - Removed the Kitty watcher, Copout state directory, background writer, pending markers, command journal, retention logic, and watcher installation lifecycle.
-- Retrieve command history and command output through Atuin's public MCP interface.
 - `copout install` enables the Atuin daemon and configures `pty-proxy` for zsh, bash, and fish.
 - `copout doctor` and `copout verify` now diagnose Atuin history and output capture directly.
