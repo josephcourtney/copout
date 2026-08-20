@@ -44,8 +44,9 @@ def test_print_writes_rendered_result_to_stdout(monkeypatch) -> None:
         cli.record,
         "build_record",
         lambda: {
-            "version": 2,
+            "version": 3,
             "scope": "command",
+            "source": "atuin",
             "history_id": "abc",
             "command": "echo hi",
             "result": {"status": 0},
@@ -72,7 +73,7 @@ def test_print_writes_rendered_result_to_stdout(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert result.stderr == ""
-    assert result.stdout.startswith('<copout version="2"')
+    assert result.stdout.startswith('<copout version="3"')
     assert "<![CDATA[echo hi]]>" in result.stdout
 
 
@@ -81,8 +82,9 @@ def test_json_print_emits_valid_json(monkeypatch) -> None:
         cli.record,
         "build_record",
         lambda: {
-            "version": 2,
+            "version": 3,
             "scope": "command",
+            "source": "atuin",
             "history_id": "abc",
             "command": "true",
             "result": {"status": 0},
@@ -108,3 +110,9 @@ def test_last_rejects_zero() -> None:
 
     assert result.exit_code != 0
     assert "0" in result.stderr
+
+
+def test_install_command_has_been_removed() -> None:
+    result = runner.invoke(cli.app, ["install"])
+
+    assert result.exit_code != 0

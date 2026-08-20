@@ -1,72 +1,12 @@
 from __future__ import annotations
 
 import subprocess
-from dataclasses import dataclass
+from dataclasses import replace
 
 import pytest
 
 from copout import atuin
 from copout.atuin import AtuinError, DaemonInfo, HistoryEntry, daemon_info, recent_entries
-
-
-@dataclass(frozen=True)
-class FakeOutput:
-    text: str
-
-
-@dataclass(frozen=True)
-class FakeStatus:
-    healthy: bool = True
-    version: str = "18.19.0"
-    pid: int = 123
-    protocol: int = 1
-
-
-class FakeSemantic:
-    def __init__(self, outputs: dict[str, str | None]) -> None:
-        self.outputs = outputs
-        self.calls: list[str] = []
-
-    async def output(self, history_id: str) -> FakeOutput | None:
-        self.calls.append(history_id)
-        value = self.outputs.get(history_id)
-        return None if value is None else FakeOutput(value)
-
-
-class FakeClient:
-    description = "unix:/tmp/atuin.sock"
-
-    def __init__(self, outputs: dict[str, str | None] | None = None) -> None:
-        self.semantic = FakeSemantic(outputs or {})
-
-    async def status(self) -> FakeStatus:
-        return FakeStatus()
-
-
-class FakeContext:
-    def __init__(self, client: FakeClient) -> None:
-        self.client = client
-
-    async def __aenter__(self) -> FakeClient:
-        return self.client
-
-    async def __aexit__(
-        self,
-        exc_type: object,
-        exc: object,
-        tb: object,
-    ) -> None:
-        return None
-
-
-class FakeConnect:
-    def __init__(self, client: FakeClient) -> None:
-        self.client = client
-        self.timeouts: list[float] = []
-
-    def __call__(self, *, timeout: float) -> FakeContext:
-        self.timeouts.append(timeout)
-        return FakeContext(self.client)
 
 
 def test_parse_history_list_preserves_multiline_command() -> None:
@@ -137,62 +77,61 @@ def test_load_history_requires_shell_session(monkeypatch: pytest.MonkeyPatch) ->
         atuin._load_history()
 
 
-def test_recent_entries_filters_copout_sorts_and_fetches_output() -> None:
+def test_recent_entries_filters_copout_preserves_order_and_fetches_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     entries = [
         HistoryEntry("3", "copout -p", "/tmp", 0, 0.1, "2026-08-19 11:00:00"),
         HistoryEntry("2", "false", "/tmp", 1, 0.2, "2026-08-19 10:00:00"),
         HistoryEntry("1", "echo one", "/tmp", 0, 0.1, "2026-08-19 09:00:00"),
     ]
-    client = FakeClient({"2": "failed\n", "1": "one\n"})
-    connect = FakeConnect(client)
+    calls: list[list[str]] = []
 
-    result = recent_entries(
-        2,
-        history_loader=lambda: entries,
-        connect_factory=connect,
-    )
+    async def add_outputs(selected: list[HistoryEntry]) -> list[HistoryEntry]:
+        calls.append([entry.id for entry in selected])
+        outputs = {"2": "failed\n", "1": "one\n"}
+        return [replace(entry, output=outputs.get(entry.id)) for entry in selected]
+
+    monkeypatch.setattr(atuin, "_load_history", lambda: entries)
+    monkeypatch.setattr(atuin, "_add_outputs", add_outputs)
+
+    result = recent_entries(2)
 
     assert [entry.id for entry in result] == ["2", "1"]
     assert [entry.output for entry in result] == ["failed\n", "one\n"]
-    assert client.semantic.calls == ["2", "1"]
-    assert connect.timeouts == [3.0]
+    assert calls == [["2", "1"]]
 
 
-def test_recent_entries_failed_only_filters_before_limit() -> None:
+def test_recent_entries_failed_only_filters_before_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     entries = [
         HistoryEntry("3", "exit 2", exit_status=2, timestamp="2026-08-19 11:00:00"),
         HistoryEntry("2", "true", exit_status=0, timestamp="2026-08-19 10:00:00"),
         HistoryEntry("1", "false", exit_status=1, timestamp="2026-08-19 09:00:00"),
     ]
+    monkeypatch.setattr(atuin, "_load_history", lambda: entries)
 
-    result = recent_entries(
-        1,
-        failed_only=True,
-        include_output=False,
-        history_loader=lambda: entries,
-    )
+    result = recent_entries(1, failed_only=True, include_output=False)
 
     assert [entry.id for entry in result] == ["3"]
 
 
-def test_recent_entries_degrades_to_history_when_jerakeen_is_unavailable() -> None:
+def test_recent_entries_degrades_to_history_when_output_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     entry = HistoryEntry("1", "echo hi", timestamp="2026-08-19 09:00:00")
 
-    def fail_connect(*, timeout: float) -> FakeContext:
-        del timeout
+    async def fail_outputs(selected: list[HistoryEntry]) -> list[HistoryEntry]:
+        del selected
         raise RuntimeError("daemon unavailable")
 
-    assert recent_entries(
-        1,
-        history_loader=lambda: [entry],
-        connect_factory=fail_connect,
-    ) == [entry]
+    monkeypatch.setattr(atuin, "_load_history", lambda: [entry])
+    monkeypatch.setattr(atuin, "_add_outputs", fail_outputs)
+
+    assert recent_entries(1) == [entry]
 
 
-def test_daemon_info_comes_from_jerakeen() -> None:
-    info = daemon_info(connect_factory=FakeConnect(FakeClient()))
-
-    assert info == DaemonInfo(
+def test_daemon_info_runs_async_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    expected = DaemonInfo(
         description="unix:/tmp/atuin.sock",
         healthy=True,
         version="18.19.0",
@@ -200,11 +139,19 @@ def test_daemon_info_comes_from_jerakeen() -> None:
         protocol=1,
     )
 
+    async def load_info() -> DaemonInfo:
+        return expected
 
-def test_daemon_info_normalizes_connection_errors() -> None:
-    def fail_connect(*, timeout: float) -> FakeContext:
+    monkeypatch.setattr(atuin, "_daemon_info", load_info)
+    assert daemon_info() == expected
+
+
+def test_daemon_info_normalizes_connection_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_connect(*, timeout: float) -> object:
         del timeout
         raise RuntimeError("no socket")
 
+    monkeypatch.setattr(atuin, "connect", fail_connect)
+
     with pytest.raises(AtuinError, match="Jerakeen could not connect"):
-        daemon_info(connect_factory=fail_connect)
+        daemon_info()

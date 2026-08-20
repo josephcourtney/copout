@@ -2,88 +2,224 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
+from dataclasses import dataclass
 
-from .atuin import AtuinError, daemon_info, recent_entries
+from ._process import run_process
+from .atuin import AtuinError, DaemonInfo, HistoryEntry, daemon_info, recent_entries
+
+
+@dataclass(frozen=True, slots=True)
+class Diagnostic:
+    atuin_path: str | None = None
+    atuin_version: str | None = None
+    session_present: bool = False
+    daemon_enabled: bool | None = None
+    daemon_autostart: bool | None = None
+    pty_proxy_enabled: bool | None = None
+    daemon: DaemonInfo | None = None
+    daemon_error: str | None = None
+    latest: HistoryEntry | None = None
+    history_error: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Verification:
+    ok: bool
+    message: str
 
 
 def _command(args: list[str]) -> tuple[int, str]:
+    result = run_process(args)
+    if result.error is not None:
+        return result.returncode, result.error
+    return result.returncode, result.stdout or result.stderr
+
+
+def _config_enabled(atuin: str, key: str) -> bool | None:
+    code, value = _command([atuin, "config", "get", key, "--resolved"])
+    if code != 0:
+        return None
+
+    normalized = value.casefold()
+    if normalized == "true":
+        return True
+    if normalized == "false":
+        return False
+    return None
+
+
+def inspect() -> Diagnostic:
+    session_present = bool(os.environ.get("ATUIN_SESSION"))
+    atuin_path = shutil.which("atuin")
+    if atuin_path is None:
+        return Diagnostic(session_present=session_present)
+
+    code, version = _command([atuin_path, "--version"])
+    daemon_enabled = _config_enabled(atuin_path, "daemon.enabled")
+    daemon_autostart = _config_enabled(atuin_path, "daemon.autostart")
+    pty_proxy_enabled = _config_enabled(atuin_path, "pty_proxy.enabled")
+
+    daemon: DaemonInfo | None = None
+    daemon_error: str | None = None
     try:
-        result = subprocess.run(args, capture_output=True, text=True, timeout=3, check=False)
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return 127, str(exc)
-    return result.returncode, (result.stdout or result.stderr).strip()
+        daemon = daemon_info()
+    except AtuinError as exc:
+        daemon_error = str(exc)
+
+    latest: HistoryEntry | None = None
+    history_error: str | None = None
+    if session_present:
+        try:
+            entries = recent_entries(1, include_output=bool(daemon and daemon.healthy))
+        except AtuinError as exc:
+            history_error = str(exc)
+        else:
+            latest = entries[0] if entries else None
+
+    return Diagnostic(
+        atuin_path=atuin_path,
+        atuin_version=version if code == 0 else None,
+        session_present=session_present,
+        daemon_enabled=daemon_enabled,
+        daemon_autostart=daemon_autostart,
+        pty_proxy_enabled=pty_proxy_enabled,
+        daemon=daemon,
+        daemon_error=daemon_error,
+        latest=latest,
+        history_error=history_error,
+    )
+
+
+def _state(value: bool | None) -> str:
+    if value is None:
+        return "unavailable"
+    return "yes" if value else "NO"
+
+
+def _verification(result: Diagnostic) -> Verification:
+    if result.atuin_path is None:
+        return Verification(False, "Atuin is not on PATH")
+    if not result.session_present:
+        return Verification(False, "ATUIN_SESSION is not set")
+    if result.history_error is not None:
+        return Verification(False, result.history_error)
+    if result.daemon is None:
+        detail = f": {result.daemon_error}" if result.daemon_error else ""
+        return Verification(False, f"cannot reach Atuin daemon{detail}")
+    if not result.daemon.healthy:
+        return Verification(False, "Atuin daemon is unhealthy")
+    if result.latest is None:
+        return Verification(False, "no current-session history")
+    if result.latest.output is None:
+        return Verification(False, "command output was not captured")
+    return Verification(True, "PASS")
+
+
+def _print_remediation(result: Diagnostic) -> None:
+    commands = [
+        command
+        for enabled, command in (
+            (result.daemon_enabled, "atuin config set daemon.enabled true"),
+            (result.daemon_autostart, "atuin config set daemon.autostart true"),
+            (result.pty_proxy_enabled, "atuin config set pty_proxy.enabled true"),
+        )
+        if enabled is not True
+    ]
+    if not commands:
+        return
+
+    print("\nremediation:")
+    for command in commands:
+        print(f"  {command}")
+    print("\n  Open a new shell afterward, run a command, then run:")
+    print("    copout verify")
 
 
 def doctor() -> int:
+    result = inspect()
     print("copout doctor")
-    atuin_path = shutil.which("atuin")
-    print(f"  atuin executable: {atuin_path or 'missing'}")
-    if not atuin_path:
+    print(f"  atuin executable: {result.atuin_path or 'missing'}")
+    if result.atuin_path is None:
         print("\ndiagnosis:\n  FAIL: Atuin is a required dependency and is not on PATH.")
         return 2
 
-    code, version = _command([atuin_path, "--version"])
-    print(f"  atuin version:    {version if code == 0 else 'unavailable'}")
-    session = os.environ.get("ATUIN_SESSION", "")
-    print(f"  shell session:    {'present' if session else 'MISSING'}")
-    code, daemon = _command([atuin_path, "config", "get", "daemon", "--resolved"])
-    print("  daemon config:    " + ("available" if code == 0 else "unavailable"))
-    if code == 0 and daemon:
-        for line in daemon.splitlines():
-            print(f"    {line}")
+    print(f"  atuin version:    {result.atuin_version or 'unavailable'}")
+    print(f"  shell session:    {'present' if result.session_present else 'MISSING'}")
 
-    daemon_available = False
-    try:
-        info = daemon_info()
-    except AtuinError as exc:
-        print("  jerakeen daemon:  NO")
-        print(f"    {exc}")
+    print("\nconfiguration:")
+    print(f"  daemon.enabled:    {_state(result.daemon_enabled)}")
+    print(f"  daemon.autostart:  {_state(result.daemon_autostart)}")
+    print(f"  pty_proxy.enabled: {_state(result.pty_proxy_enabled)}")
+
+    print("\nruntime:")
+    if result.daemon is None:
+        print("  jerakeen daemon:   NO")
+        if result.daemon_error:
+            print(f"    {result.daemon_error}")
     else:
-        daemon_available = info.healthy
-        print(f"  jerakeen daemon:  {'yes' if info.healthy else 'UNHEALTHY'}")
-        print(f"    target:          {info.description}")
-        print(f"    atuin:           {info.version}")
-        print(f"    protocol:        {info.protocol}")
-        print(f"    pid:             {info.pid}")
+        print(f"  jerakeen daemon:   {'yes' if result.daemon.healthy else 'UNHEALTHY'}")
+        print(f"    target:           {result.daemon.description}")
+        print(f"    atuin:            {result.daemon.version}")
+        print(f"    protocol:         {result.daemon.protocol}")
+        print(f"    pid:              {result.daemon.pid}")
 
-    if not session:
+    if result.latest is not None:
+        print(f"  latest command:    {result.latest.command}")
+        print(f"  latest status:     {result.latest.exit_status}")
+        print(f"  captured output:   {'yes' if result.latest.output is not None else 'NO'}")
+
+    if not result.session_present:
         print("\ndiagnosis:")
         print("  FAIL: ATUIN_SESSION is not set in this shell.")
         print("  Ensure normal `atuin init` shell integration is loaded, then open a new shell.")
         return 4
 
-    try:
-        entries = recent_entries(1, include_output=daemon_available)
-    except AtuinError as exc:
-        print(f"\ndiagnosis:\n  FAIL: {exc}")
+    if result.history_error is not None:
+        print(f"\ndiagnosis:\n  FAIL: {result.history_error}")
         return 3
 
-    if not entries:
+    if result.latest is None:
         print("\ndiagnosis:")
         print("  FAIL: Atuin returned no matching history entries for this session.")
         print("  Inspect `atuin history list --session` next.")
         return 4
 
-    latest = entries[0]
-    print(f"  latest command:   {latest.command}")
-    print(f"  latest status:    {latest.exit_status}")
-    print(f"  captured output:  {'yes' if latest.output is not None else 'NO'}")
-
-    if not daemon_available:
+    configuration_complete = all(
+        value is True
+        for value in (
+            result.daemon_enabled,
+            result.daemon_autostart,
+            result.pty_proxy_enabled,
+        )
+    )
+    if not configuration_complete:
         print("\ndiagnosis:")
-        print("  PARTIAL: Atuin history works, but Jerakeen cannot reach the Atuin daemon.")
-        print("  Enable the Atuin daemon and pty-proxy, then start a new shell.")
-        return 5
-    if latest.output is None:
-        print("\ndiagnosis:")
-        print("  PARTIAL: Atuin history works, but command output is unavailable.")
-        print("  The daemon output cache is ephemeral; verify pty-proxy is active in this shell.")
+        print("  PARTIAL: Atuin history works, but command-output capture is not fully configured.")
+        _print_remediation(result)
         return 5
 
-    print("\ndiagnosis:\n  PASS: Atuin history and Jerakeen daemon output are available to Copout.")
+    if result.daemon is None or not result.daemon.healthy:
+        print("\ndiagnosis:")
+        print("  PARTIAL: Atuin is configured for daemon operation, but Jerakeen")
+        print("  could not connect to a healthy Atuin daemon.")
+        print("  Open a new shell or inspect the Atuin daemon runtime.")
+        return 5
+
+    if result.latest.output is None:
+        print("\ndiagnosis:")
+        print("  PARTIAL: The Atuin daemon is reachable, but command output is unavailable.")
+        print("  The daemon output cache is ephemeral.")
+        print("  Ensure pty-proxy is active in this shell, run a new command, then")
+        print("  rerun `copout verify`.")
+        return 5
+
+    print("\ndiagnosis:")
+    print("  PASS: Atuin history and Jerakeen daemon output are available to Copout.")
     return 0
 
 
 def verify() -> int:
-    return doctor()
+    verification = _verification(inspect())
+    prefix = "copout verify: " if verification.ok else "copout verify: FAIL: "
+    print(f"{prefix}{verification.message}")
+    return 0 if verification.ok else 1

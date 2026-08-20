@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from . import clipboard, doctor, installer, record, render
+from . import clipboard, doctor, record, render
 
 app = typer.Typer(
     add_completion=False,
@@ -66,26 +66,6 @@ def doctor_command() -> None:
 def verify_command() -> None:
     """Verify that Atuin history and Jerakeen command-output capture work."""
     raise typer.Exit(doctor.verify())
-
-
-@app.command("install")
-def install_command() -> None:
-    """Configure the Atuin daemon and pty-proxy used through Jerakeen."""
-    try:
-        result = installer.install()
-    except RuntimeError as exc:
-        print(f"copout: install failed: {exc}", file=sys.stderr)
-        raise typer.Exit(1) from exc
-    typer.echo(f"Atuin:             {result.atuin_path}")
-    typer.echo(f"daemon configured: {'yes' if result.daemon_configured else 'NO'}")
-    if result.shell_file is not None:
-        typer.echo(f"shell config:      {result.shell_file}")
-        typer.echo(f"pty-proxy config:  {'yes' if result.pty_proxy_configured else 'NO'}")
-    else:
-        typer.echo("pty-proxy config:  unsupported shell; configure manually")
-    if result.changed_shell:
-        typer.echo("Open a new shell so Atuin pty-proxy becomes active.")
-    typer.echo("Then run `false; copout verify`.")
 
 
 def main() -> None:

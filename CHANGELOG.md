@@ -22,10 +22,10 @@
 
 ### Changed
 
-- Replace the Atuin MCP integration with Jerakeen for direct daemon status and command-output access.
-- Read chronological current-session history through Atuin's documented `history list` CLI because the daemon search service is command-deduplicated and history tailing is live-only.
-- Remove the custom MCP client and its MCP schema/parsing compatibility layer.
-- Rebuilt Copout around Atuin as a hard dependency and authoritative command-history source.
+- Replaced Atuin MCP access with Atuin's documented history CLI for persisted session history and Jerakeen for direct daemon output access.
+- Removed `copout install`; Copout no longer writes shell startup files or Atuin configuration.
+- `copout doctor` is read-only and reports exact Atuin configuration remediation commands; `copout verify` is a concise end-to-end assertion.
+- Removed production dependency-injection/factory plumbing that existed only for tests.
+- Added typed command/history record schemas and removed defensive renderer shape recovery.
+- Simplified structured output schema to version 3: redundant `capture` metadata was removed, provenance is represented by top-level `source` and per-run output `source`.
 - Removed the Kitty watcher, Copout state directory, background writer, pending markers, command journal, retention logic, and watcher installation lifecycle.
-- `copout install` enables the Atuin daemon and configures `pty-proxy` for zsh, bash, and fish.
-- `copout doctor` and `copout verify` now diagnose Atuin history and output capture directly.

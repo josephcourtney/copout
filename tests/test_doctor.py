@@ -1,55 +1,93 @@
 from __future__ import annotations
 
 from copout import doctor
-from copout.atuin import AtuinError, DaemonInfo, HistoryEntry
+from copout.atuin import DaemonInfo, HistoryEntry
+
+
+def diagnostic(
+    *,
+    atuin_path: str | None = "/usr/bin/atuin",
+    atuin_version: str | None = "atuin 18.19.0",
+    session_present: bool = True,
+    daemon_enabled: bool | None = True,
+    daemon_autostart: bool | None = True,
+    pty_proxy_enabled: bool | None = True,
+    daemon: DaemonInfo | None = DaemonInfo("/tmp/atuin.sock", True, "18.19.0", 123, 1),
+    daemon_error: str | None = None,
+    latest: HistoryEntry | None = HistoryEntry("id", "false", "/tmp", 1, 0.01, "", "captured\n"),
+    history_error: str | None = None,
+) -> doctor.Diagnostic:
+    return doctor.Diagnostic(
+        atuin_path=atuin_path,
+        atuin_version=atuin_version,
+        session_present=session_present,
+        daemon_enabled=daemon_enabled,
+        daemon_autostart=daemon_autostart,
+        pty_proxy_enabled=pty_proxy_enabled,
+        daemon=daemon,
+        daemon_error=daemon_error,
+        latest=latest,
+        history_error=history_error,
+    )
 
 
 def test_doctor_reports_missing_atuin(monkeypatch, capsys) -> None:
-    monkeypatch.setattr(doctor.shutil, "which", lambda executable: None)
+    monkeypatch.setattr(doctor, "inspect", lambda: diagnostic(atuin_path=None, atuin_version=None))
 
     assert doctor.doctor() == 2
     assert "Atuin is a required dependency" in capsys.readouterr().out
 
 
 def test_doctor_passes_with_history_and_jerakeen_output(monkeypatch, capsys) -> None:
-    monkeypatch.setenv("ATUIN_SESSION", "session")
-    monkeypatch.setattr(doctor.shutil, "which", lambda executable: "/usr/bin/atuin")
-    monkeypatch.setattr(doctor, "_command", lambda args: (0, "atuin 18.19.0"))
-    monkeypatch.setattr(
-        doctor,
-        "daemon_info",
-        lambda: DaemonInfo("/tmp/atuin.sock", True, "18.19.0", 123, 1),
-    )
-    monkeypatch.setattr(
-        doctor,
-        "recent_entries",
-        lambda count, include_output: [
-            HistoryEntry("id", "false", "/tmp", 1, 0.01, "2026-08-19 10:00:00", "")
-        ],
-    )
+    monkeypatch.setattr(doctor, "inspect", diagnostic)
 
     assert doctor.doctor() == 0
     output = capsys.readouterr().out
-    assert "jerakeen daemon:  yes" in output
+    assert "jerakeen daemon:   yes" in output
     assert "PASS: Atuin history and Jerakeen daemon output" in output
 
 
-def test_doctor_treats_daemon_failure_as_partial(monkeypatch, capsys) -> None:
-    monkeypatch.setenv("ATUIN_SESSION", "session")
-    monkeypatch.setattr(doctor.shutil, "which", lambda executable: "/usr/bin/atuin")
-    monkeypatch.setattr(doctor, "_command", lambda args: (0, "atuin 18.19.0"))
-
-    def no_daemon() -> DaemonInfo:
-        raise AtuinError("no daemon socket")
-
-    monkeypatch.setattr(doctor, "daemon_info", no_daemon)
+def test_doctor_reports_configuration_remediation(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         doctor,
-        "recent_entries",
-        lambda count, include_output: [HistoryEntry("id", "echo hi", output=None)],
+        "inspect",
+        lambda: diagnostic(daemon_enabled=False, pty_proxy_enabled=False),
     )
 
     assert doctor.doctor() == 5
     output = capsys.readouterr().out
-    assert "jerakeen daemon:  NO" in output
-    assert "PARTIAL: Atuin history works" in output
+    assert "command-output capture is not fully configured" in output
+    assert "atuin config set daemon.enabled true" in output
+    assert "atuin config set pty_proxy.enabled true" in output
+    assert "daemon.autostart" not in output.split("remediation:", 1)[1]
+
+
+def test_doctor_treats_daemon_failure_as_partial(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        doctor,
+        "inspect",
+        lambda: diagnostic(
+            daemon=None,
+            daemon_error="no daemon socket",
+            latest=HistoryEntry("id", "echo hi"),
+        ),
+    )
+
+    assert doctor.doctor() == 5
+    output = capsys.readouterr().out
+    assert "jerakeen daemon:   NO" in output
+    assert "configured for daemon operation" in output
+
+
+def test_verify_is_concise_pass_fail(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(doctor, "inspect", diagnostic)
+    assert doctor.verify() == 0
+    assert capsys.readouterr().out == "copout verify: PASS\n"
+
+    monkeypatch.setattr(
+        doctor,
+        "inspect",
+        lambda: diagnostic(latest=HistoryEntry("id", "false", output=None)),
+    )
+    assert doctor.verify() == 1
+    assert "command output was not captured" in capsys.readouterr().out

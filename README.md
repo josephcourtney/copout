@@ -1,15 +1,14 @@
 # Copout
 
-Copout copies recent terminal history into the clipboard as compact XML or JSON. Atuin is the source of truth for command history and metadata; Atuin's daemon plus `pty-proxy` supply recent command output.
+Copout copies recent terminal history into the clipboard as compact XML or JSON. Atuin is the source of truth for command history and metadata; Atuin's daemon plus `pty-proxy` supply recent command output. Copout uses Atuin's documented history CLI for persisted session history and Jerakeen for direct daemon access to captured output.
 
-Copout does **not** run a terminal watcher and does not maintain its own command journal.
+Copout does **not** run a terminal watcher, maintain its own command journal, or modify shell or Atuin configuration.
 
 ## Requirements
 
 - Python 3.13+
 - Atuin 18.17+ on `PATH`
 - Atuin shell integration
-- Jerakeen (installed as a Copout dependency)
 - For command output: Atuin daemon + `pty-proxy`
 - macOS `pbcopy`, Wayland `wl-copy`, or X11 `xclip`/`xsel`
 
@@ -17,16 +16,22 @@ Atuin's captured output is intentionally recent and ephemeral: the daemon keeps 
 
 ## Setup
 
+Configure Atuin itself for daemon-backed output capture:
+
 ```console
-copout install
+atuin config set daemon.enabled true
+atuin config set daemon.autostart true
+atuin config set pty_proxy.enabled true
 ```
 
-For zsh, bash, and fish this enables Atuin's daemon/autostart configuration and adds `pty-proxy` initialization before the normal `atuin init` line. Open a new shell afterward, then verify:
+Open a new shell afterward, run a command, then verify the complete path:
 
 ```console
 false
 copout verify
 ```
+
+`copout doctor` is read-only. It reports missing configuration and prints the Atuin commands needed to correct it, but does not make changes itself.
 
 ## Use
 
@@ -36,12 +41,8 @@ copout -p              # print instead of clipboard
 copout --json          # JSON instead of XML
 copout -n 5            # last five commands in the current Atuin session
 copout --failure       # most recent failed command
-copout doctor          # integration diagnostics
-copout verify          # assert history + output capture work
+copout doctor          # detailed integration diagnostics
+copout verify          # concise history + output assertion
 ```
 
-## Integration boundary
-
-Copout no longer starts or talks to `atuin mcp`.
-
-Persisted command selection comes from Atuin's documented `atuin history list --session` interface. Captured output and daemon health come from Jerakeen's public Python API, which talks directly to the local Atuin daemon. This split preserves Copout's chronological "last N invocations" behavior without depending on Atuin's private database or daemon protocol.
+Copout retrieves persisted chronological history with `atuin history list --session` and retrieves recent captured output from the Atuin daemon through Jerakeen. It does not access Atuin's private database or implement the daemon gRPC protocol itself.
