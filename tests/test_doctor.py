@@ -3,6 +3,9 @@ from __future__ import annotations
 from copout import doctor
 from copout.atuin import DaemonInfo, HistoryEntry
 
+DEFAULT_DAEMON = DaemonInfo("/tmp/atuin.sock", True, "18.19.0", 123, 1)
+DEFAULT_LATEST = HistoryEntry("id", "false", "/tmp", 1, 0.01, "", "captured\n")
+
 
 def diagnostic(
     *,
@@ -12,9 +15,9 @@ def diagnostic(
     daemon_enabled: bool | None = True,
     daemon_autostart: bool | None = True,
     pty_proxy_enabled: bool | None = True,
-    daemon: DaemonInfo | None = DaemonInfo("/tmp/atuin.sock", True, "18.19.0", 123, 1),
+    daemon: DaemonInfo | None = DEFAULT_DAEMON,
     daemon_error: str | None = None,
-    latest: HistoryEntry | None = HistoryEntry("id", "false", "/tmp", 1, 0.01, "", "captured\n"),
+    latest: HistoryEntry | None = DEFAULT_LATEST,
     history_error: str | None = None,
 ) -> doctor.Diagnostic:
     return doctor.Diagnostic(

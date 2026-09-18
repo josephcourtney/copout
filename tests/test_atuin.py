@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import subprocess
 from dataclasses import replace
 
 import pytest
 
 from copout import atuin
+from copout._process import ProcessResult
 from copout.atuin import AtuinError, DaemonInfo, HistoryEntry, daemon_info, recent_entries
 
 
@@ -25,13 +25,15 @@ def test_parse_history_list_preserves_multiline_command() -> None:
         + "\0"
     )
 
-    assert atuin._parse_history_list(raw) == [
+    entries = atuin._parse_history_list(raw)
+    assert len(entries) == 1
+    assert entries[0].duration == pytest.approx(0.071)
+    assert [replace(entries[0], duration=None)] == [
         HistoryEntry(
             id="0198cafe-0000-7000-8000-000000000001",
             command="printf 'hello\\nworld\\n'\nsecond line",
             cwd="/Users/josephcourtney/code",
             exit_status=1,
-            duration=0.071,
             timestamp="2026-08-19 12:56:34",
         )
     ]
@@ -47,16 +49,16 @@ def test_load_history_uses_documented_history_list(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(atuin.shutil, "which", lambda executable: "/usr/bin/atuin")
     captured: list[list[str]] = []
 
-    def run(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+    def run(args: list[str], *, timeout: float) -> ProcessResult:
+        assert timeout == 5
         captured.append(args)
-        return subprocess.CompletedProcess(
-            args,
+        return ProcessResult(
             0,
             "id\x1f2026-08-19 10:00:00\x1f/tmp\x1f0\x1f2ms\x1fecho hi\0",
             "",
         )
 
-    monkeypatch.setattr(atuin.subprocess, "run", run)
+    monkeypatch.setattr(atuin, "run_process", run)
 
     assert atuin._load_history() == [
         HistoryEntry("id", "echo hi", "/tmp", 0, 0.002, "2026-08-19 10:00:00")

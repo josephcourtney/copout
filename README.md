@@ -46,3 +46,16 @@ copout verify          # concise history + output assertion
 ```
 
 Copout retrieves persisted chronological history with `atuin history list --session` and retrieves recent captured output from the Atuin daemon through Jerakeen. It does not access Atuin's private database or implement the daemon gRPC protocol itself.
+
+## Testing
+
+Run `just check` for lint, formatting, typing, and the test suite. Command tests execute the installed `copout` launcher and module entry point in subprocesses, with a controlled Atuin executable, Jerakeen client, and clipboard helper. They cover selection, captured and unavailable output, service errors, diagnostics, and clipboard delivery without modifying your clipboard or history.
+
+The real shell capture test is opt-in. In an Atuin-integrated terminal with output capture enabled, run these as two separate commands:
+
+```console
+printf 'copout-live-probe\n'
+COPOUT_LIVE_ATUIN=1 .venv/bin/pytest -q tests/test_live.py
+```
+
+This checks that the real installed command retrieves the probe from the current session and returns its captured output. It fails if the probe is missing or output capture is unavailable. The ordinary suite skips this test; passing controlled command tests does not establish that your shell's Atuin capture is configured correctly.

@@ -20,6 +20,12 @@
 
 ## Unreleased
 
+### Fixed
+
+- Restore the documented copy/print CLI and synchronous console entry point, removing the experimental future-history tail path.
+- Align the package version with project metadata and repair stale test assumptions.
+- Exercise the installed command with controlled service and clipboard processes, and provide an opt-in real shell capture check.
+
 ### Changed
 
 - Replaced Atuin MCP access with Atuin's documented history CLI for persisted session history and Jerakeen for direct daemon output access.
