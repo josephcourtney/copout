@@ -7,6 +7,7 @@ import sys
 import sysconfig
 from dataclasses import dataclass
 from pathlib import Path
+from xml.etree import ElementTree
 
 import pytest
 
@@ -42,6 +43,9 @@ import json
 import os
 from types import SimpleNamespace
 
+class AtuinUnsupportedError(Exception):
+    pass
+
 class Client:
     description = "test daemon"
 
@@ -50,13 +54,22 @@ class Client:
         return self
 
     async def output(self, history_id):
+        if os.environ.get("OUTPUT_STALL"):
+            await asyncio.Event().wait()
         await asyncio.sleep(0)
+        if os.environ.get("OUTPUT_UNSUPPORTED"):
+            raise AtuinUnsupportedError("UNIMPLEMENTED")
         if os.environ.get("OUTPUT_ERROR"):
             raise RuntimeError("output unavailable")
         text = json.loads(os.environ["OUTPUTS"]).get(history_id)
-        return None if text is None else SimpleNamespace(text=text)
+        return None if text is None else SimpleNamespace(
+            text=text, truncated=os.environ.get("TRUNCATED") == "1",
+            observed_bytes=int(os.environ.get("OBSERVED_BYTES", len(text.encode()))),
+            total_bytes=len(text.encode()))
 
     async def status(self):
+        if os.environ.get("STATUS_STALL"):
+            await asyncio.Event().wait()
         return SimpleNamespace(healthy=True, version="18.19.0", pid=123, protocol=1)
 
     async def __aenter__(self):
@@ -118,6 +131,11 @@ def command_env(tmp_path: Path) -> CommandEnvironment:
         "OUTPUT_ERROR",
         "DAEMON_ERROR",
         "CLIPBOARD_STATUS",
+        "TRUNCATED",
+        "OBSERVED_BYTES",
+        "OUTPUT_STALL",
+        "OUTPUT_UNSUPPORTED",
+        "STATUS_STALL",
     ):
         env.pop(key, None)
     env.update(
@@ -156,7 +174,7 @@ def test_command_copies_to_helper(command_env: CommandEnvironment) -> None:
     assert result.returncode == 0, result.stderr
     assert result.stdout == result.stderr == ""
     copied = command_env.clipboard.read_text()
-    assert copied.startswith('<copout version="3"')
+    assert copied.startswith('<copout version="4"')
     assert "<![CDATA[héllo\n]]>" in copied
 
 
@@ -251,3 +269,63 @@ def test_command_diagnostics(
     assert result.returncode == (0 if available else 5 if subcommand == "doctor" else 1)
     assert result.stderr == ""
     assert ("PASS" if available else "daemon") in result.stdout
+
+
+@pytest.mark.parametrize("scenario", ["OUTPUT_STALL", "STATUS_STALL"])
+def test_stalled_daemon_requests_terminate(command_env: CommandEnvironment, scenario: str) -> None:
+    command_env.env[scenario] = "1"
+    if scenario == "OUTPUT_STALL":
+        result = command_env.run("--print", "--json")
+        assert result.returncode == 0, result.stderr
+        assert json.loads(result.stdout)["output"]["state"] == "unavailable"
+    else:
+        result = command_env.run("doctor")
+        assert result.returncode == 5
+        assert "status request timed out" in result.stdout
+    assert result.stderr == ""
+
+
+@pytest.mark.parametrize("as_json", [False, True])
+def test_truncated_output_metadata(command_env: CommandEnvironment, as_json: bool) -> None:
+    command_env.env.update(TRUNCATED="1", OBSERVED_BYTES="10000")
+    result = command_env.run("--print", *(["--json"] if as_json else []))
+    assert result.returncode == 0, result.stderr
+    if as_json:
+        output = json.loads(result.stdout)["output"]
+        assert output["truncated"] is True
+        assert output["observed_bytes"] == 10000
+        assert output["total_bytes"] == len("héllo\n".encode())
+    else:
+        output_element = ElementTree.fromstring(result.stdout).find("run/output")
+        assert output_element is not None
+        assert output_element.attrib["truncated"] == "true"
+        assert output_element.attrib["observed_bytes"] == "10000"
+        assert output_element.attrib["total_bytes"] == str(len("héllo\n".encode()))
+
+
+def test_command_xml_round_trips_ansi_output(command_env: CommandEnvironment) -> None:
+    original = "\x1b[31mred\x1b[0m\r\n"
+    command_env.env["OUTPUTS"] = json.dumps({"new": original})
+    result = command_env.run("--print")
+    assert result.returncode == 0, result.stderr
+    output = ElementTree.fromstring(result.stdout).find("run/output")
+    assert output is not None
+    assert output.attrib["encoding"] == "json-string"
+    assert json.loads(output.text or "") == original
+
+
+@pytest.mark.parametrize("subcommand", ["doctor", "verify", "print"])
+def test_unsupported_output_rpc_is_reported(
+    command_env: CommandEnvironment, subcommand: str
+) -> None:
+    command_env.env["OUTPUT_UNSUPPORTED"] = "1"
+    args = ("--print", "--json") if subcommand == "print" else (subcommand,)
+    result = command_env.run(*args)
+    assert result.returncode == {"doctor": 5, "verify": 1, "print": 0}[subcommand]
+    assert result.stderr == ""
+    assert "UNIMPLEMENTED" in result.stdout
+    assert "does not implement" in result.stdout
+    if subcommand == "print":
+        output = json.loads(result.stdout)["output"]
+        assert output["state"] == "unavailable"
+        assert "UNIMPLEMENTED" in output["error"]

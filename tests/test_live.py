@@ -26,7 +26,13 @@ def test_live_shell_capture() -> None:
     assert result.stderr == ""
     runs = json.loads(result.stdout)["runs"]
     probes = [run for run in runs if run["command"].strip() == "printf 'copout-live-probe\\n'"]
-    assert probes, "Run the README probe command in this Atuin shell immediately before the test"
+    assert probes, (
+        "No completed standalone probe in the last 10 commands of this Atuin session. "
+        "Enter printf 'copout-live-probe\\n' alone, wait for the next prompt, then run this test. "
+        "Do not paste the probe and pytest together; repeat the probe after opening a new terminal."
+    )
     output = probes[-1]["output"]
-    assert output["state"] == "captured", "The real Atuin output cache did not capture the probe"
+    assert output["state"] == "captured", (
+        output.get("error") or "The real Atuin output cache did not capture the probe"
+    )
     assert output["text"].replace("\r\n", "\n") == "copout-live-probe\n"

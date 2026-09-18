@@ -44,7 +44,7 @@ def test_print_writes_rendered_result_to_stdout(monkeypatch) -> None:
         cli.record,
         "build_record",
         lambda: {
-            "version": 3,
+            "version": 4,
             "scope": "command",
             "source": "atuin",
             "history_id": "abc",
@@ -52,8 +52,13 @@ def test_print_writes_rendered_result_to_stdout(monkeypatch) -> None:
             "result": {"status": 0},
             "output": {
                 "state": "captured",
+                "error": None,
                 "source": "atuin-pty-proxy",
                 "text": "hi\n",
+                "utf8_bytes": 3,
+                "truncated": False,
+                "observed_bytes": 3,
+                "total_bytes": 3,
             },
             "context": {"cwd": "/tmp"},
             "timing": {"duration": 0.01},
@@ -73,7 +78,7 @@ def test_print_writes_rendered_result_to_stdout(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert result.stderr == ""
-    assert result.stdout.startswith('<copout version="3"')
+    assert result.stdout.startswith('<copout version="4"')
     assert "<![CDATA[echo hi]]>" in result.stdout
 
 
@@ -82,7 +87,7 @@ def test_json_print_emits_valid_json(monkeypatch) -> None:
         cli.record,
         "build_record",
         lambda: {
-            "version": 3,
+            "version": 4,
             "scope": "command",
             "source": "atuin",
             "history_id": "abc",
@@ -90,8 +95,13 @@ def test_json_print_emits_valid_json(monkeypatch) -> None:
             "result": {"status": 0},
             "output": {
                 "state": "captured",
+                "error": None,
                 "source": "atuin-pty-proxy",
                 "text": "",
+                "utf8_bytes": 0,
+                "truncated": False,
+                "observed_bytes": 0,
+                "total_bytes": 0,
             },
             "context": {"cwd": "/tmp"},
             "timing": {"duration": 0.01},

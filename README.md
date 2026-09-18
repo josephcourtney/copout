@@ -55,7 +55,22 @@ The real shell capture test is opt-in. In an Atuin-integrated terminal with outp
 
 ```console
 printf 'copout-live-probe\n'
+```
+
+Wait for the next shell prompt. Then run the test separately in that same terminal (do not paste both commands together):
+
+```console
 COPOUT_LIVE_ATUIN=1 .venv/bin/pytest -q tests/test_live.py
 ```
 
 This checks that the real installed command retrieves the probe from the current session and returns its captured output. It fails if the probe is missing or output capture is unavailable. The ordinary suite skips this test; passing controlled command tests does not establish that your shell's Atuin capture is configured correctly.
+
+## Output format (schema version 4)
+
+JSON output retains the original command and captured text. Each output record includes `utf8_bytes` (the bytes returned in `text`), plus Atuin's `truncated`, `observed_bytes`, and `total_bytes` metadata. Unknown metadata is `null` in JSON and omitted from XML; unavailable output must not be interpreted as a complete empty capture.
+
+XML normally uses readable CDATA. If text contains XML-invalid characters (including ANSI escape codes), or carriage returns that XML parsing would normalize, the element has `encoding="json-string"` and its CDATA contains a JSON string literal. Parse the XML, then JSON-decode that element's text to recover the original string. Attribute values that require this treatment have a companion marker such as `cwd_encoding="json-string"`; attribute tabs and newlines are encoded too. Consumers of version 3 must recognize these version 4 encoding markers before interpreting text. Characters are preserved rather than stripped.
+
+Daemon connection establishment, individual output requests, and status requests each have a three-second deadline. An unavailable or timed-out output request leaves usable history with output marked unavailable. A timed-out status request is reported by `copout doctor` and `copout verify`.
+
+If output retrieval fails, the output record's `error` field (or XML attribute) preserves the reason. `UNIMPLEMENTED` means the daemon does not provide the output RPC expected by the installed Jerakeen client; it is not evidence of a missing capture or a disabled configuration flag. A healthy daemon status alone does not establish output API compatibility. `copout doctor` and `copout verify` report this distinction.

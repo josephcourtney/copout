@@ -6,32 +6,62 @@ import json
 from .record import CopoutRecord, RunRecord
 
 
-def _xml_text(value: object) -> str:
-    return html.escape("" if value is None else str(value))
+def _encoded_text(text: str, *, attribute: bool = False) -> tuple[str, bool]:
+    # XML 1.0 excludes most controls, surrogates, U+FFFE and U+FFFF.
+    # XML parsing also normalizes CRs and attribute whitespace.
+    needs_encoding = any(
+        not (
+            char in "\t\n"
+            or " " <= char <= "\ud7ff"
+            or "\ue000" <= char <= "\ufffd"
+            or "\U00010000" <= char <= "\U0010ffff"
+        )
+        or (attribute and char in "\t\n")
+        for char in text
+    )
+    return (json.dumps(text, ensure_ascii=True), True) if needs_encoding else (text, False)
 
 
-def _cdata(value: object) -> str:
-    text = "" if value is None else str(value)
-    return f"<![CDATA[{text.replace(']]>', ']]]]><![CDATA[>')}]]>"
+def _attribute(name: str, value: str | int | float) -> str:
+    text, encoded = _encoded_text(str(value), attribute=True)
+    marker = f' {name}_encoding="json-string"' if encoded else ""
+    return f'{name}="{html.escape(text)}"{marker}'
+
+
+def _element(name: str, text: str, attrs: str = "") -> str:
+    text, encoded = _encoded_text(text)
+    marker = ' encoding="json-string"' if encoded else ""
+    cdata = text.replace("]]>", "]]]]><![CDATA[>")
+    return f"<{name}{attrs}{marker}><![CDATA[{cdata}]]></{name}>"
 
 
 def _render_run(run: RunRecord, indent: str = "  ") -> list[str]:
     output = run["output"]
-    attrs = [f'history_id="{_xml_text(run["history_id"])}"']
+    attrs = [_attribute("history_id", run["history_id"])]
 
     if (status := run["result"]["status"]) is not None:
-        attrs.append(f'status="{_xml_text(status)}"')
+        attrs.append(_attribute("status", status))
     if cwd := run["context"]["cwd"]:
-        attrs.append(f'cwd="{_xml_text(cwd)}"')
+        attrs.append(_attribute("cwd", cwd))
     if (duration := run["timing"]["duration"]) is not None:
-        attrs.append(f'duration="{_xml_text(duration)}"')
+        attrs.append(_attribute("duration", duration))
 
     lines = [f"{indent}<run {' '.join(attrs)}>"]
-    lines.append(f"{indent}  <command>{_cdata(run['command'])}</command>")
-    lines.append(
-        f'{indent}  <output state="{_xml_text(output["state"])}" '
-        f'source="{_xml_text(output["source"])}">{_cdata(output["text"])}</output>'
-    )
+    lines.append(f"{indent}  {_element('command', run['command'])}")
+    output_attrs = [
+        _attribute("state", output["state"]),
+        _attribute("source", output["source"]),
+        _attribute("utf8_bytes", output["utf8_bytes"]),
+    ]
+    if output["error"] is not None:
+        output_attrs.append(_attribute("error", output["error"]))
+    for key in ("truncated", "observed_bytes", "total_bytes"):
+        value = output[key]
+        if value is not None:
+            output_attrs.append(
+                _attribute(key, str(value).lower() if isinstance(value, bool) else value)
+            )
+    lines.append(f"{indent}  {_element('output', output['text'], ' ' + ' '.join(output_attrs))}")
     lines.append(f"{indent}</run>")
     return lines
 
@@ -41,12 +71,12 @@ def render(record: CopoutRecord, *, as_json: bool = False) -> str:
         return json.dumps(record, indent=2, ensure_ascii=False) + "\n"
 
     attrs = [
-        f'version="{_xml_text(record["version"])}"',
-        f'source="{_xml_text(record["source"])}"',
+        _attribute("version", record["version"]),
+        _attribute("source", record["source"]),
     ]
     runs: list[RunRecord]
     if record["scope"] == "history":
-        attrs.append(f'selected="{_xml_text(record["history"]["selected"])}"')
+        attrs.append(_attribute("selected", record["history"]["selected"]))
         runs = record["runs"]
     else:
         runs = [record]

@@ -94,3 +94,23 @@ def test_verify_is_concise_pass_fail(monkeypatch, capsys) -> None:
     )
     assert doctor.verify() == 1
     assert "command output was not captured" in capsys.readouterr().out
+
+
+def test_inspect_reads_history_before_starting_daemon_client(monkeypatch) -> None:
+    calls: list[str] = []
+    monkeypatch.setenv("ATUIN_SESSION", "session")
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: "/usr/bin/atuin")
+    monkeypatch.setattr(doctor, "_command", lambda args: (0, "true"))
+
+    def history(count: int) -> list[HistoryEntry]:
+        calls.append("history")
+        return [DEFAULT_LATEST]
+
+    def daemon() -> DaemonInfo:
+        calls.append("daemon")
+        return DEFAULT_DAEMON
+
+    monkeypatch.setattr(doctor, "recent_entries", history)
+    monkeypatch.setattr(doctor, "daemon_info", daemon)
+    assert doctor.inspect().latest == DEFAULT_LATEST
+    assert calls == ["history", "daemon"]

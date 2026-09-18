@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from xml.etree import ElementTree
 
 from copout import record, render
 from copout.atuin import AtuinError, HistoryEntry
@@ -23,7 +24,7 @@ def test_build_record(monkeypatch) -> None:
         ],
     )
     result = record.build_record()
-    assert result["version"] == 3
+    assert result["version"] == 4
     assert result["source"] == "atuin"
     assert result["command"] == "pytest"
     assert result["result"]["status"] == 1
@@ -72,7 +73,7 @@ def test_render_json(monkeypatch) -> None:
     rendered = render.render(record.build_record(), as_json=True)
     payload = json.loads(rendered)
     assert payload["history_id"] == "id1"
-    assert payload["version"] == 3
+    assert payload["version"] == 4
     assert payload["source"] == "atuin"
 
 
@@ -86,3 +87,43 @@ def test_render_xml_contains_command_and_output(monkeypatch) -> None:
     assert 'source="atuin"' in rendered
     assert "<![CDATA[echo <x>]]>" in rendered
     assert "<![CDATA[<x>\n]]>" in rendered
+
+
+def test_xml_round_trips_controls_and_attribute_whitespace(monkeypatch) -> None:
+    command = "printf '\x00\x1b'\r\n]]>"
+    cwd = "/tmp/tab\tnewline\ncarriage\rcontrol\x01"
+    output = "\x00\x01\x1b\ufffe\uffff\r\n]]> café"
+    monkeypatch.setattr(
+        record, "recent_entries", lambda count: [HistoryEntry("id", command, cwd, output=output)]
+    )
+    root = ElementTree.fromstring(render.render(record.build_record()))
+    run = root.find("run")
+    assert run is not None
+    assert run.attrib["cwd_encoding"] == "json-string"
+    assert json.loads(run.attrib["cwd"]) == cwd
+    for name, expected in (("command", command), ("output", output)):
+        element = run.find(name)
+        assert element is not None
+        assert element.attrib["encoding"] == "json-string"
+        assert json.loads(element.text or "") == expected
+
+
+def test_xml_plain_text_and_cdata_terminator_round_trip(monkeypatch) -> None:
+    text = "café\n\t]]> & < >"
+    monkeypatch.setattr(
+        record, "recent_entries", lambda count: [HistoryEntry("id", text, output=text)]
+    )
+    root = ElementTree.fromstring(render.render(record.build_record()))
+    for name in ("command", "output"):
+        element = root.find(f"run/{name}")
+        assert element is not None
+        assert "encoding" not in element.attrib
+        assert element.text == text
+
+
+def test_unavailable_capture_metadata_is_unknown(monkeypatch) -> None:
+    monkeypatch.setattr(record, "recent_entries", lambda count: [HistoryEntry("id", "true")])
+    output = record.build_record()["output"]
+    assert output["truncated"] is None
+    assert output["observed_bytes"] is None
+    assert output["total_bytes"] is None

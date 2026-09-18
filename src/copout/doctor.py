@@ -59,22 +59,23 @@ def inspect() -> Diagnostic:
     daemon_autostart = _config_enabled(atuin_path, "daemon.autostart")
     pty_proxy_enabled = _config_enabled(atuin_path, "pty_proxy.enabled")
 
+    latest: HistoryEntry | None = None
+    history_error: str | None = None
+    if session_present:
+        try:
+            entries = recent_entries(1)
+        except AtuinError as exc:
+            history_error = str(exc)
+        else:
+            latest = entries[0] if entries else None
+
+    # Finish CLI subprocesses before initializing gRPC background threads.
     daemon: DaemonInfo | None = None
     daemon_error: str | None = None
     try:
         daemon = daemon_info()
     except AtuinError as exc:
         daemon_error = str(exc)
-
-    latest: HistoryEntry | None = None
-    history_error: str | None = None
-    if session_present:
-        try:
-            entries = recent_entries(1, include_output=bool(daemon and daemon.healthy))
-        except AtuinError as exc:
-            history_error = str(exc)
-        else:
-            latest = entries[0] if entries else None
 
     return Diagnostic(
         atuin_path=atuin_path,
@@ -110,6 +111,8 @@ def _verification(result: Diagnostic) -> Verification:
         return Verification(False, "Atuin daemon is unhealthy")
     if result.latest is None:
         return Verification(False, "no current-session history")
+    if result.latest.output_error:
+        return Verification(False, result.latest.output_error)
     if result.latest.output is None:
         return Verification(False, "command output was not captured")
     return Verification(True, "PASS")
@@ -203,6 +206,10 @@ def doctor() -> int:
         print("  PARTIAL: Atuin is configured for daemon operation, but Jerakeen")
         print("  could not connect to a healthy Atuin daemon.")
         print("  Open a new shell or inspect the Atuin daemon runtime.")
+        return 5
+
+    if result.latest.output_error:
+        print(f"\ndiagnosis:\n  PARTIAL: {result.latest.output_error}")
         return 5
 
     if result.latest.output is None:

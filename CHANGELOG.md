@@ -20,6 +20,17 @@
 
 ## Unreleased
 
+### Output and daemon reliability
+
+- Report unsupported output RPCs and other retrieval errors instead of treating every failure as a missing capture.
+- Read CLI history before opening daemon clients during diagnostics, avoiding subprocess forks after gRPC initialization.
+- Clarify that live-test probe commands must complete separately in the same shell session.
+
+- Advance output schema to version 4: encode XML-invalid text reversibly with explicit JSON-string markers, and preserve daemon truncation and byte-count metadata.
+- Bound daemon output and status requests to three seconds; retain history when output requests time out.
+- Reconcile contributor instructions with the documented history CLI and public Jerakeen API boundary.
+- Add XML round-trip, truncation, and stalled-service command regression tests.
+
 ### Fixed
 
 - Restore the documented copy/print CLI and synchronous console entry point, removing the experimental future-history tail path.

@@ -5,7 +5,7 @@ from typing import Literal, TypedDict
 
 from .atuin import AtuinError, HistoryEntry, recent_entries
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 OutputState = Literal["captured", "unavailable"]
 OutputSource = Literal["atuin-pty-proxy", "atuin-history-only"]
@@ -20,6 +20,10 @@ class OutputRecord(TypedDict):
     source: OutputSource
     text: str
     utf8_bytes: int
+    truncated: bool | None
+    observed_bytes: int | None
+    total_bytes: int | None
+    error: str | None
 
 
 class ContextRecord(TypedDict):
@@ -89,9 +93,13 @@ def _entry_record(entry: HistoryEntry) -> RunRecord:
         "result": {"status": entry.exit_status},
         "output": {
             "state": "captured" if captured else "unavailable",
+            "error": entry.output_error,
             "source": "atuin-pty-proxy" if captured else "atuin-history-only",
             "text": text,
             "utf8_bytes": len(text.encode()),
+            "truncated": entry.output_truncated if captured else None,
+            "observed_bytes": entry.output_observed_bytes if captured else None,
+            "total_bytes": entry.output_total_bytes if captured else None,
         },
         "context": {"cwd": entry.cwd},
         "timing": {"duration": entry.duration, "recorded_at": entry.timestamp},

@@ -129,7 +129,7 @@ def test_recent_entries_degrades_to_history_when_output_is_unavailable(
     monkeypatch.setattr(atuin, "_load_history", lambda: [entry])
     monkeypatch.setattr(atuin, "_add_outputs", fail_outputs)
 
-    assert recent_entries(1) == [entry]
+    assert recent_entries(1) == [replace(entry, output_error="RuntimeError: daemon unavailable")]
 
 
 def test_daemon_info_runs_async_probe(monkeypatch: pytest.MonkeyPatch) -> None:

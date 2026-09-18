@@ -6,9 +6,11 @@ import re
 import shutil
 from dataclasses import dataclass, replace
 
-from jerakeen import connect
+from jerakeen import AtuinUnsupportedError, connect
 
 from ._process import run_process
+
+_DAEMON_TIMEOUT = 3.0
 
 _HISTORY_FIELD_SEPARATOR = "\x1f"
 _HISTORY_FORMAT = _HISTORY_FIELD_SEPARATOR.join(
@@ -39,6 +41,10 @@ class HistoryEntry:
     duration: float | None = None
     timestamp: str = ""
     output: str | None = None
+    output_truncated: bool | None = None
+    output_observed_bytes: int | None = None
+    output_total_bytes: int | None = None
+    output_error: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,14 +134,30 @@ def _is_copout_command(command: str) -> bool:
 
 
 async def _add_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
-    async with connect(timeout=3.0) as atuin:
+    async with connect(timeout=_DAEMON_TIMEOUT) as atuin:
 
         async def populate(entry: HistoryEntry) -> HistoryEntry:
             try:
-                output = await atuin.semantic.output(entry.id)
-            except Exception:  # output is best-effort and intentionally ephemeral
+                async with asyncio.timeout(_DAEMON_TIMEOUT):
+                    output = await atuin.semantic.output(entry.id)
+            except AtuinUnsupportedError:
+                return replace(
+                    entry,
+                    output_error="Atuin daemon does not implement the output RPC required by Jerakeen (UNIMPLEMENTED); check client/daemon compatibility",
+                )
+            except TimeoutError:
+                return replace(entry, output_error="Atuin daemon output request timed out")
+            except Exception as exc:  # preserve history, but report why output is unavailable
+                return replace(entry, output_error=f"{type(exc).__name__}: {exc}")
+            if output is None:
                 return entry
-            return replace(entry, output=None if output is None else output.text)
+            return replace(
+                entry,
+                output=output.text,
+                output_truncated=output.truncated,
+                output_observed_bytes=output.observed_bytes,
+                output_total_bytes=output.total_bytes,
+            )
 
         return list(await asyncio.gather(*(populate(entry) for entry in entries)))
 
@@ -161,16 +183,16 @@ def recent_entries(
 
     try:
         return asyncio.run(_add_outputs(entries))
-    except Exception:
-        # Persistent history remains useful when the daemon or its ephemeral
-        # command-output cache is unavailable.
-        return entries
+    except Exception as exc:
+        # Persistent history remains useful when the daemon is unavailable.
+        return [replace(entry, output_error=f"{type(exc).__name__}: {exc}") for entry in entries]
 
 
 async def _daemon_info() -> DaemonInfo:
     try:
-        async with connect(timeout=3.0) as atuin:
-            status = await atuin.status()
+        async with connect(timeout=_DAEMON_TIMEOUT) as atuin:
+            async with asyncio.timeout(_DAEMON_TIMEOUT):
+                status = await atuin.status()
             return DaemonInfo(
                 description=atuin.description,
                 healthy=status.healthy,
@@ -178,6 +200,8 @@ async def _daemon_info() -> DaemonInfo:
                 pid=status.pid,
                 protocol=status.protocol,
             )
+    except TimeoutError as exc:
+        raise AtuinError("Atuin daemon status request timed out") from exc
     except Exception as exc:
         raise AtuinError(f"Jerakeen could not connect to the Atuin daemon: {exc}") from exc
 
