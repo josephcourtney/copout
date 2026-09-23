@@ -39,6 +39,66 @@ def test_atuin_failure_goes_to_stderr_and_returns_exit_3(monkeypatch) -> None:
     assert "copout: run `copout doctor` for diagnostics" in result.stderr
 
 
+def test_clipboard_helper_starts_before_record_build(monkeypatch) -> None:
+    events: list[str] = []
+
+    class Writer:
+        def write(self, text: str) -> int:
+            assert text == "payload"
+            events.append("clipboard-write")
+            return 0
+
+        def abort(self) -> None:
+            pass
+
+    def start_writer() -> Writer:
+        events.append("clipboard-start")
+        return Writer()
+
+    def build_record() -> dict:
+        events.append("record-build")
+        return {}
+
+    monkeypatch.setattr(cli.clipboard, "start_clipboard_writer", start_writer)
+    monkeypatch.setattr(cli.record, "build_record", build_record)
+    monkeypatch.setattr(cli.render, "render", lambda captured, *, as_json: "payload")
+
+    result = runner.invoke(cli.app)
+
+    assert result.exit_code == 0, result.stderr
+    assert result.stdout == result.stderr == ""
+    assert events == ["clipboard-start", "record-build", "clipboard-write"]
+
+
+def test_record_failure_aborts_prestarted_clipboard_helper(monkeypatch) -> None:
+    events: list[str] = []
+
+    class Writer:
+        def write(self, text: str) -> int:
+            raise AssertionError(f"clipboard payload must not be written: {text!r}")
+
+        def abort(self) -> None:
+            events.append("clipboard-abort")
+
+    def start_writer() -> Writer:
+        events.append("clipboard-start")
+        return Writer()
+
+    def fail() -> dict:
+        events.append("record-build")
+        raise record.AtuinError("history unavailable")
+
+    monkeypatch.setattr(cli.clipboard, "start_clipboard_writer", start_writer)
+    monkeypatch.setattr(cli.record, "build_record", fail)
+
+    result = runner.invoke(cli.app)
+
+    assert result.exit_code == 3
+    assert result.stdout == ""
+    assert "copout: history unavailable" in result.stderr
+    assert events == ["clipboard-start", "record-build", "clipboard-abort"]
+
+
 def test_print_writes_rendered_result_to_stdout(monkeypatch) -> None:
     monkeypatch.setattr(
         cli.record,
@@ -65,13 +125,13 @@ def test_print_writes_rendered_result_to_stdout(monkeypatch) -> None:
         },
     )
 
-    def clipboard_must_not_be_called(text: str) -> int:
+    def clipboard_must_not_be_started():
         raise AssertionError("clipboard must not be used with --print")
 
     monkeypatch.setattr(
         cli.clipboard,
-        "copy_to_clipboard",
-        clipboard_must_not_be_called,
+        "start_clipboard_writer",
+        clipboard_must_not_be_started,
     )
 
     result = runner.invoke(cli.app, ["--print"])
