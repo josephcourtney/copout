@@ -25,6 +25,7 @@
 - Upgrade to Jerakeen 0.10.0 and Atuin daemon protocol 3; captured output is now retrieved through `History.GetCommandOutput` rather than the removed Semantic service.
 - Report unsupported output RPCs and other retrieval errors instead of treating every failure as a missing capture.
 - Read CLI history before opening daemon clients during diagnostics, avoiding subprocess forks after gRPC initialization.
+- Start clipboard helpers before Jerakeen/gRPC access and abort them without writing on capture failures, avoiding gRPC fork diagnostics during normal clipboard delivery.
 - Clarify that live-test probe commands must complete separately in the same shell session.
 
 - Advance output schema to version 4: encode XML-invalid text reversibly with explicit JSON-string markers, and preserve daemon truncation and byte-count metadata.
