@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -79,6 +81,51 @@ def test_load_history_requires_shell_session(monkeypatch: pytest.MonkeyPatch) ->
         atuin._load_history()
 
 
+def test_add_outputs_uses_protocol3_history_service(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    class FakeHistory:
+        async def output(self, history_id: str):
+            calls.append(history_id)
+            return SimpleNamespace(
+                text="captured\n",
+                truncated=True,
+                observed_bytes=24,
+                total_bytes=9,
+            )
+
+    class FakeAtuin:
+        history = FakeHistory()
+
+    class FakeConnection:
+        async def __aenter__(self):
+            return FakeAtuin()
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+    def fake_connect(*, timeout: float, rpc_timeout: float):
+        assert timeout == atuin._DAEMON_TIMEOUT
+        assert rpc_timeout == atuin._DAEMON_TIMEOUT
+        return FakeConnection()
+
+    monkeypatch.setattr(atuin, "connect", fake_connect)
+
+    result = asyncio.run(atuin._add_outputs([HistoryEntry("history-id", "echo captured")]))
+
+    assert calls == ["history-id"]
+    assert result == [
+        HistoryEntry(
+            "history-id",
+            "echo captured",
+            output="captured\n",
+            output_truncated=True,
+            output_observed_bytes=24,
+            output_total_bytes=9,
+        )
+    ]
+
+
 def test_recent_entries_filters_copout_preserves_order_and_fetches_output(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -136,9 +183,9 @@ def test_daemon_info_runs_async_probe(monkeypatch: pytest.MonkeyPatch) -> None:
     expected = DaemonInfo(
         description="unix:/tmp/atuin.sock",
         healthy=True,
-        version="18.19.0",
+        version="18.23.0",
         pid=123,
-        protocol=1,
+        protocol=3,
     )
 
     async def load_info() -> DaemonInfo:
@@ -149,8 +196,8 @@ def test_daemon_info_runs_async_probe(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_daemon_info_normalizes_connection_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fail_connect(*, timeout: float) -> object:
-        del timeout
+    def fail_connect(*, timeout: float, rpc_timeout: float) -> object:
+        del timeout, rpc_timeout
         raise RuntimeError("no socket")
 
     monkeypatch.setattr(atuin, "connect", fail_connect)
