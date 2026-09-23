@@ -18,7 +18,7 @@ import sys
 
 args = sys.argv[1:]
 if args == ["--version"]:
-    print("atuin 18.19.0")
+    print("atuin 18.23.0")
 elif args[:2] == ["config", "get"]:
     print("true")
 elif args[:2] == ["history", "list"]:
@@ -50,7 +50,7 @@ class Client:
     description = "test daemon"
 
     @property
-    def semantic(self):
+    def history(self):
         return self
 
     async def output(self, history_id):
@@ -70,7 +70,7 @@ class Client:
     async def status(self):
         if os.environ.get("STATUS_STALL"):
             await asyncio.Event().wait()
-        return SimpleNamespace(healthy=True, version="18.19.0", pid=123, protocol=1)
+        return SimpleNamespace(healthy=True, version="18.23.0", pid=123, protocol=3)
 
     async def __aenter__(self):
         if os.environ.get("DAEMON_ERROR"):
@@ -80,7 +80,10 @@ class Client:
     async def __aexit__(self, *args):
         pass
 
-def connect(*, timeout):
+def connect(*, timeout, rpc_timeout=None, check_compatibility=True):
+    assert timeout > 0
+    assert rpc_timeout is None or rpc_timeout > 0
+    assert check_compatibility is True
     return Client()
 """
 
