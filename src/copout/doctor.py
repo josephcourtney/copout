@@ -16,6 +16,7 @@ class Diagnostic:
     daemon_enabled: bool | None = None
     daemon_autostart: bool | None = None
     pty_proxy_enabled: bool | None = None
+    pty_proxy_active: bool = False
     daemon: DaemonInfo | None = None
     daemon_error: str | None = None
     latest: HistoryEntry | None = None
@@ -50,9 +51,13 @@ def _config_enabled(atuin: str, key: str) -> bool | None:
 
 def inspect() -> Diagnostic:
     session_present = bool(os.environ.get("ATUIN_SESSION"))
+    pty_proxy_active = bool(os.environ.get("ATUIN_PTY_PROXY_ACTIVE"))
     atuin_path = shutil.which("atuin")
     if atuin_path is None:
-        return Diagnostic(session_present=session_present)
+        return Diagnostic(
+            session_present=session_present,
+            pty_proxy_active=pty_proxy_active,
+        )
 
     code, version = _command([atuin_path, "--version"])
     daemon_enabled = _config_enabled(atuin_path, "daemon.enabled")
@@ -84,6 +89,7 @@ def inspect() -> Diagnostic:
         daemon_enabled=daemon_enabled,
         daemon_autostart=daemon_autostart,
         pty_proxy_enabled=pty_proxy_enabled,
+        pty_proxy_active=pty_proxy_active,
         daemon=daemon,
         daemon_error=daemon_error,
         latest=latest,
@@ -102,6 +108,8 @@ def _verification(result: Diagnostic) -> Verification:
         return Verification(False, "Atuin is not on PATH")
     if not result.session_present:
         return Verification(False, "ATUIN_SESSION is not set")
+    if not result.pty_proxy_active:
+        return Verification(False, "pty-proxy is not active in this shell")
     if result.history_error is not None:
         return Verification(False, result.history_error)
     if result.daemon is None:
@@ -155,6 +163,7 @@ def doctor() -> int:
     print(f"  pty_proxy.enabled: {_state(result.pty_proxy_enabled)}")
 
     print("\nruntime:")
+    print(f"  pty-proxy active:  {'yes' if result.pty_proxy_active else 'NO'}")
     if result.daemon is None:
         print("  jerakeen daemon:   NO")
         if result.daemon_error:
@@ -201,6 +210,13 @@ def doctor() -> int:
         _print_remediation(result)
         return 5
 
+    if not result.pty_proxy_active:
+        print("\ndiagnosis:")
+        print("  PARTIAL: pty-proxy is configured but is not active in this shell.")
+        print("  Initialize `atuin pty-proxy` before normal `atuin init` in the shell")
+        print("  startup file, then open a new shell, run a command, and rerun `copout verify`.")
+        return 5
+
     if result.daemon is None or not result.daemon.healthy:
         print("\ndiagnosis:")
         print("  PARTIAL: Atuin is configured for daemon operation, but Jerakeen")
@@ -214,10 +230,10 @@ def doctor() -> int:
 
     if result.latest.output is None:
         print("\ndiagnosis:")
-        print("  PARTIAL: The Atuin daemon is reachable, but command output is unavailable.")
-        print("  The daemon output cache is ephemeral.")
-        print("  Ensure pty-proxy is active in this shell, run a new command, then")
-        print("  rerun `copout verify`.")
+        print("  PARTIAL: pty-proxy and the Atuin daemon are active, but command output")
+        print("  was not captured for the latest command.")
+        print("  Run a new command and rerun `copout verify`; if it still fails, inspect")
+        print("  the pty-proxy capture path and OSC 133 shell markers.")
         return 5
 
     print("\ndiagnosis:")
