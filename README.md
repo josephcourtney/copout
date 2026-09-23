@@ -51,19 +51,19 @@ Copout retrieves persisted chronological history with `atuin history list --sess
 
 Run `just check` for lint, formatting, typing, and the test suite. Command tests execute the installed `copout` launcher and module entry point in subprocesses, with a controlled Atuin executable, Jerakeen client, and clipboard helper. They cover selection, captured and unavailable output, service errors, diagnostics, and clipboard delivery without modifying your clipboard or history.
 
-The real shell capture test is opt-in. In an Atuin-integrated terminal with output capture enabled, run these as two separate commands:
+The real shell integration tests are opt-in. In an Atuin-integrated terminal with output capture enabled, run these as two separate commands:
 
 ```console
 printf 'copout-live-probe\n'
 ```
 
-Wait for the next shell prompt. Then run the test separately in that same terminal (do not paste both commands together):
+Wait for the next shell prompt. Then run the tests separately in that same terminal (do not paste both commands together):
 
 ```console
 COPOUT_LIVE_ATUIN=1 .venv/bin/pytest -q tests/test_live.py
 ```
 
-This checks that the real installed command retrieves the probe from the current session and returns captured terminal output containing the visible probe text. Atuin captures rendered terminal contents rather than raw stdout, so the final newline may be omitted and terminal-cell padding may appear as trailing spaces. The test allows those renderer artifacts while Copout itself preserves the text Atuin returns unchanged. It fails if the probe is missing or output capture is unavailable. The ordinary suite skips this test; passing controlled command tests does not establish that your shell's Atuin capture is configured correctly.
+The tests check that the real installed command retrieves the probe from the current session and returns captured terminal output containing the visible probe text. They also exercise normal clipboard delivery through a temporary `pbcopy` sink and require clean stderr, catching regressions that fork a clipboard helper after gRPC has initialized. Atuin captures rendered terminal contents rather than raw stdout, so the final newline may be omitted and terminal-cell padding may appear as trailing spaces. The capture assertion allows those renderer artifacts while Copout itself preserves the text Atuin returns unchanged. The tests fail if the probe is missing or output capture is unavailable. The ordinary suite skips these checks; passing controlled command tests does not establish that your shell's Atuin capture is configured correctly.
 
 ## Output format (schema version 4)
 
