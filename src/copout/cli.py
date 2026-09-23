@@ -18,21 +18,34 @@ app = typer.Typer(
 
 
 def run(*, print_output: bool, as_json: bool, count: int, failure: bool) -> int:
+    writer: clipboard.ClipboardWriter | None = None
+    if not print_output:
+        try:
+            writer = clipboard.start_clipboard_writer()
+        except clipboard.ClipboardStartError as exc:
+            print(f"copout: {exc}", file=sys.stderr)
+            return 127
+
     try:
-        captured = (
-            record.build_record()
-            if count == 1 and not failure
-            else record.build_history(count=count, failed_only=failure)
-        )
-    except record.AtuinError as exc:
-        print(f"copout: {exc}", file=sys.stderr)
-        print("copout: run `copout doctor` for diagnostics", file=sys.stderr)
-        return 3
-    rendered = render.render(captured, as_json=as_json)
-    if print_output:
-        sys.stdout.write(rendered)
-        return 0
-    return clipboard.copy_to_clipboard(rendered)
+        try:
+            captured = (
+                record.build_record()
+                if count == 1 and not failure
+                else record.build_history(count=count, failed_only=failure)
+            )
+        except record.AtuinError as exc:
+            print(f"copout: {exc}", file=sys.stderr)
+            print("copout: run `copout doctor` for diagnostics", file=sys.stderr)
+            return 3
+
+        rendered = render.render(captured, as_json=as_json)
+        if writer is None:
+            sys.stdout.write(rendered)
+            return 0
+        return writer.write(rendered)
+    finally:
+        if writer is not None:
+            writer.abort()
 
 
 @app.callback()
