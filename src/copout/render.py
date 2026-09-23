@@ -3,11 +3,14 @@ from __future__ import annotations
 import copy
 import html
 import json
+import re
 from typing import Literal
 
 from .record import CopoutRecord, RunRecord
 
 type OutputMode = Literal["semantic", "rendered"]
+
+_SGR_RE = re.compile(r"\x1b\[[0-9:;]*m")
 
 
 def _encoded_text(text: str, *, attribute: bool = False) -> tuple[str, bool]:
@@ -40,8 +43,8 @@ def _element(name: str, text: str, attrs: str = "") -> str:
 
 
 def _semantic_text(text: str) -> str:
-    """Remove terminal-end whitespace while preserving internal layout."""
-    return text.rstrip()
+    """Keep visible text while dropping SGR styling and terminal-end whitespace."""
+    return _SGR_RE.sub("", text).rstrip()
 
 
 def _format_duration(seconds: float) -> str:
