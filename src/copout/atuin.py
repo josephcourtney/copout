@@ -140,11 +140,12 @@ async def _add_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
             try:
                 async with asyncio.timeout(_DAEMON_TIMEOUT):
                     output = await atuin.history.output(entry.id)
-            except AtuinUnsupportedError:
-                return replace(
-                    entry,
-                    output_error="Atuin daemon does not support command-output retrieval",
-                )
+            except AtuinUnsupportedError as exc:
+                detail = str(exc)
+                error = "Atuin daemon does not implement command-output retrieval"
+                if detail:
+                    error = f"{error} ({detail})"
+                return replace(entry, output_error=error)
             except TimeoutError:
                 return replace(entry, output_error="Atuin daemon output request timed out")
             except Exception as exc:  # preserve history, but report why output is unavailable
