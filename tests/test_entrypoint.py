@@ -167,7 +167,7 @@ def test_command_prints_captured_output(command_env: CommandEnvironment, module:
     assert result.stderr == ""
     payload = json.loads(result.stdout)
     assert payload["history_id"] == "new"
-    assert payload["output"]["text"] == "héllo\n"
+    assert payload["output"]["text"] == "héllo"
     assert payload["output"]["state"] == "captured"
     assert payload["timing"]["duration"] == pytest.approx(0.071)
     assert not command_env.clipboard.exists()
@@ -178,8 +178,52 @@ def test_command_copies_to_helper(command_env: CommandEnvironment) -> None:
     assert result.returncode == 0, result.stderr
     assert result.stdout == result.stderr == ""
     copied = command_env.clipboard.read_text()
-    assert copied.startswith('<copout version="4"')
-    assert "<![CDATA[héllo\n]]>" in copied
+    assert copied.startswith('<copout version="5"')
+    assert "<![CDATA[héllo]]>" in copied
+    assert "utf8_bytes" not in copied
+    assert 'source="atuin"' not in copied
+
+
+def test_semantic_mode_removes_terminal_end_padding(command_env: CommandEnvironment) -> None:
+    command_env.env["OUTPUTS"] = json.dumps({"new": "hello\n       \t"})
+    result = command_env.run("--print")
+    assert result.returncode == 0, result.stderr
+    output = ElementTree.fromstring(result.stdout).find("run/output")
+    assert output is not None
+    assert output.text == "hello"
+    assert output.attrib == {}
+
+
+def test_rendered_mode_preserves_terminal_output_and_metadata(
+    command_env: CommandEnvironment,
+) -> None:
+    original = "hello\n       \t"
+    command_env.env["OUTPUTS"] = json.dumps({"new": original})
+    command_env.env["OBSERVED_BYTES"] = "275"
+    result = command_env.run("--print", "--rendered")
+    assert result.returncode == 0, result.stderr
+    root = ElementTree.fromstring(result.stdout)
+    assert root.attrib["source"] == "atuin"
+    output = root.find("run/output")
+    assert output is not None
+    assert output.text == original
+    assert output.attrib["state"] == "captured"
+    assert output.attrib["utf8_bytes"] == str(len(original.encode()))
+    assert output.attrib["observed_bytes"] == "275"
+    assert output.attrib["total_bytes"] == str(len(original.encode()))
+
+
+def test_raw_mode_reports_atuin_limitation_before_services(
+    command_env: CommandEnvironment,
+) -> None:
+    command_env.env.pop("ATUIN_SESSION")
+    (command_env.bin_dir / "atuin").unlink()
+    (command_env.bin_dir / "pbcopy").unlink()
+    result = command_env.run("--raw")
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert "Atuin does not expose the original PTY byte stream" in result.stderr
+    assert "--rendered" in result.stderr
 
 
 @pytest.mark.parametrize("failure", [False, True])
@@ -260,6 +304,8 @@ def test_command_help_needs_no_services(command_env: CommandEnvironment, flag: s
     result = command_env.run(flag)
     assert result.returncode == 0, result.stderr
     assert "--print" in result.stdout
+    assert "--rendered" in result.stdout
+    assert "--raw" in result.stdout
 
 
 @pytest.mark.parametrize("subcommand", ["doctor", "verify"])
@@ -299,15 +345,27 @@ def test_truncated_output_metadata(command_env: CommandEnvironment, as_json: boo
         assert output["truncated"] is True
         assert output["observed_bytes"] == 10000
         assert output["total_bytes"] == len("héllo\n".encode())
+        assert output["utf8_bytes"] == len("héllo".encode())
     else:
         output_element = ElementTree.fromstring(result.stdout).find("run/output")
         assert output_element is not None
-        assert output_element.attrib["truncated"] == "true"
-        assert output_element.attrib["observed_bytes"] == "10000"
-        assert output_element.attrib["total_bytes"] == str(len("héllo\n".encode()))
+        assert output_element.attrib == {"truncated": "true"}
 
 
-def test_command_xml_round_trips_ansi_output(command_env: CommandEnvironment) -> None:
+def test_rendered_xml_round_trips_ansi_output(command_env: CommandEnvironment) -> None:
+    original = "\x1b[31mred\x1b[0m\r\n"
+    command_env.env["OUTPUTS"] = json.dumps({"new": original})
+    result = command_env.run("--print", "--rendered")
+    assert result.returncode == 0, result.stderr
+    output = ElementTree.fromstring(result.stdout).find("run/output")
+    assert output is not None
+    assert output.attrib["encoding"] == "json-string"
+    assert json.loads(output.text or "") == original
+
+
+def test_semantic_xml_keeps_ansi_but_trims_terminal_end_whitespace(
+    command_env: CommandEnvironment,
+) -> None:
     original = "\x1b[31mred\x1b[0m\r\n"
     command_env.env["OUTPUTS"] = json.dumps({"new": original})
     result = command_env.run("--print")
@@ -315,7 +373,7 @@ def test_command_xml_round_trips_ansi_output(command_env: CommandEnvironment) ->
     output = ElementTree.fromstring(result.stdout).find("run/output")
     assert output is not None
     assert output.attrib["encoding"] == "json-string"
-    assert json.loads(output.text or "") == original
+    assert json.loads(output.text or "") == "\x1b[31mred\x1b[0m"
 
 
 @pytest.mark.parametrize("subcommand", ["doctor", "verify", "print"])
