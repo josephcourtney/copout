@@ -63,13 +63,15 @@ Wait for the next shell prompt. Then run the test separately in that same termin
 COPOUT_LIVE_ATUIN=1 .venv/bin/pytest -q tests/test_live.py
 ```
 
-This checks that the real installed command retrieves the probe from the current session and returns its captured output. It fails if the probe is missing or output capture is unavailable. The ordinary suite skips this test; passing controlled command tests does not establish that your shell's Atuin capture is configured correctly.
+This checks that the real installed command retrieves the probe from the current session and returns captured terminal output containing the visible probe text. Atuin captures rendered terminal contents rather than raw stdout, so the final newline may be omitted and terminal-cell padding may appear as trailing spaces. The test allows those renderer artifacts while Copout itself preserves the text Atuin returns unchanged. It fails if the probe is missing or output capture is unavailable. The ordinary suite skips this test; passing controlled command tests does not establish that your shell's Atuin capture is configured correctly.
 
 ## Output format (schema version 4)
 
-JSON output retains the original command and captured text. Each output record includes `utf8_bytes` (the bytes returned in `text`), plus Atuin's `truncated`, `observed_bytes`, and `total_bytes` metadata. Unknown metadata is `null` in JSON and omitted from XML; unavailable output must not be interpreted as a complete empty capture.
+JSON output retains the original command and the captured text returned by Atuin. Atuin's command capture is rendered, mostly visible terminal output rather than a raw stdout byte stream: control bytes may be removed, carriage returns are not necessarily retained, and trailing newlines may be trimmed before Copout receives the text. Copout does not further normalize that captured text.
 
-XML normally uses readable CDATA. If text contains XML-invalid characters (including ANSI escape codes), or carriage returns that XML parsing would normalize, the element has `encoding="json-string"` and its CDATA contains a JSON string literal. Parse the XML, then JSON-decode that element's text to recover the original string. Attribute values that require this treatment have a companion marker such as `cwd_encoding="json-string"`; attribute tabs and newlines are encoded too. Consumers of version 3 must recognize these version 4 encoding markers before interpreting text. Characters are preserved rather than stripped.
+Each output record includes `utf8_bytes` (the bytes returned in `text`), plus Atuin's `truncated`, `observed_bytes`, and `total_bytes` metadata. Unknown metadata is `null` in JSON and omitted from XML; unavailable output must not be interpreted as a complete empty capture.
+
+XML normally uses readable CDATA. If text contains XML-invalid characters (including ANSI escape codes), or carriage returns that XML parsing would normalize, the element has `encoding="json-string"` and its CDATA contains a JSON string literal. Parse the XML, then JSON-decode that element's text to recover the original string. Attribute values that require this treatment have a companion marker such as `cwd_encoding="json-string"`; attribute tabs and newlines are encoded too. Consumers of version 3 must recognize these version 4 encoding markers before interpreting text. Copout preserves characters in the text returned by Atuin rather than stripping them for XML convenience.
 
 Daemon connection establishment, individual output requests, and status requests each have a three-second deadline. An unavailable or timed-out output request leaves usable history with output marked unavailable. A timed-out status request is reported by `copout doctor` and `copout verify`.
 
