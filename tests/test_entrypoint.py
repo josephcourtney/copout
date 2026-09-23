@@ -145,6 +145,7 @@ def command_env(tmp_path: Path) -> CommandEnvironment:
         PATH=str(bin_dir),
         PYTHONPATH=os.pathsep.join((str(tmp_path), str(Path(__file__).parents[1] / "src"))),
         ATUIN_SESSION="test-session",
+        ATUIN_PTY_PROXY_ACTIVE="1",
         CLIPBOARD_FILE=str(clipboard),
         HISTORY_ROWS=json.dumps(
             [
