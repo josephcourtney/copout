@@ -7,31 +7,31 @@ Copout does **not** run a terminal watcher, maintain its own command journal, or
 ## Requirements
 
 - Python 3.13+
-- Atuin 18.17+ on `PATH`
+- Atuin 18.23.x on `PATH`
 - Atuin shell integration
-- For command output: Atuin daemon + `pty-proxy`
+- For command output: Atuin daemon + `pty-proxy` + output capture enabled
 - macOS `pbcopy`, Wayland `wl-copy`, or X11 `xclip`/`xsel`
 
-Atuin's captured output is intentionally recent and ephemeral: the daemon keeps recent output in memory and it disappears when the daemon stops. Command history and metadata remain available through Atuin.
+Atuin's captured output is intentionally recent and ephemeral: the daemon keeps recent output locally and command history/metadata remain available independently. Copout treats missing captured output as unavailable rather than as an empty command result.
 
 ## Setup
 
-Configure Atuin itself for daemon-backed output capture:
+Use Atuin's own output-capture setup command:
 
 ```console
-atuin config set daemon.enabled true
-atuin config set daemon.autostart true
-atuin config set pty_proxy.enabled true
+atuin config enable output-capture
 ```
 
-Open a new shell afterward, run a command, then verify the complete path:
+On Atuin 18.23 this enables the daemon when necessary, enables `pty_proxy.enabled` and `output.enabled`, and restarts an autostart-managed daemon so the capture backend picks up the new configuration. Follow any restart instructions printed by Atuin, then open a new shell.
+
+Run a command and verify the complete path:
 
 ```console
-false
+printf 'copout output probe\n'
 copout verify
 ```
 
-`copout doctor` is read-only. It reports missing configuration and prints the Atuin commands needed to correct it, but does not make changes itself.
+`copout doctor` is read-only. It distinguishes configuration from runtime state and reports `daemon.enabled`, `daemon.autostart`, `pty_proxy.enabled`, `output.enabled`, whether pty-proxy is active in the current shell, daemon compatibility, and whether the latest command has captured output.
 
 ## Use
 
