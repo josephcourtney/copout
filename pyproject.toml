@@ -1,6 +1,6 @@
 [project]
   name = "copout"
-  version = "0.8.2"
+  version = "0.9.0"
   description = "Copy recent Atuin command history and captured terminal output as structured context."
   readme = "README.md"
   authors = [
