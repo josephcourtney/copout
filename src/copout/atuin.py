@@ -134,16 +134,16 @@ def _is_copout_command(command: str) -> bool:
 
 
 async def _add_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
-    async with connect(timeout=_DAEMON_TIMEOUT) as atuin:
+    async with connect(timeout=_DAEMON_TIMEOUT, rpc_timeout=_DAEMON_TIMEOUT) as atuin:
 
         async def populate(entry: HistoryEntry) -> HistoryEntry:
             try:
                 async with asyncio.timeout(_DAEMON_TIMEOUT):
-                    output = await atuin.semantic.output(entry.id)
+                    output = await atuin.history.output(entry.id)
             except AtuinUnsupportedError:
                 return replace(
                     entry,
-                    output_error="Atuin daemon does not implement the output RPC required by Jerakeen (UNIMPLEMENTED); check client/daemon compatibility",
+                    output_error="Atuin daemon does not support command-output retrieval",
                 )
             except TimeoutError:
                 return replace(entry, output_error="Atuin daemon output request timed out")
@@ -190,7 +190,7 @@ def recent_entries(
 
 async def _daemon_info() -> DaemonInfo:
     try:
-        async with connect(timeout=_DAEMON_TIMEOUT) as atuin:
+        async with connect(timeout=_DAEMON_TIMEOUT, rpc_timeout=_DAEMON_TIMEOUT) as atuin:
             async with asyncio.timeout(_DAEMON_TIMEOUT):
                 status = await atuin.status()
             return DaemonInfo(
