@@ -15,6 +15,7 @@ def diagnostic(
     daemon_enabled: bool | None = True,
     daemon_autostart: bool | None = True,
     pty_proxy_enabled: bool | None = True,
+    output_enabled: bool | None = True,
     pty_proxy_active: bool = True,
     daemon: DaemonInfo | None = DEFAULT_DAEMON,
     daemon_error: str | None = None,
@@ -28,6 +29,7 @@ def diagnostic(
         daemon_enabled=daemon_enabled,
         daemon_autostart=daemon_autostart,
         pty_proxy_enabled=pty_proxy_enabled,
+        output_enabled=output_enabled,
         pty_proxy_active=pty_proxy_active,
         daemon=daemon,
         daemon_error=daemon_error,
@@ -48,6 +50,7 @@ def test_doctor_passes_with_history_and_jerakeen_output(monkeypatch, capsys) -> 
 
     assert doctor.doctor() == 0
     output = capsys.readouterr().out
+    assert "output.enabled:    yes" in output
     assert "pty-proxy active:  yes" in output
     assert "jerakeen daemon:   yes" in output
     assert "PASS: Atuin history and Jerakeen daemon output" in output
@@ -57,15 +60,27 @@ def test_doctor_reports_configuration_remediation(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         doctor,
         "inspect",
-        lambda: diagnostic(daemon_enabled=False, pty_proxy_enabled=False),
+        lambda: diagnostic(output_enabled=False),
     )
 
     assert doctor.doctor() == 5
     output = capsys.readouterr().out
+    assert "output.enabled:    NO" in output
     assert "command-output capture is not fully configured" in output
-    assert "atuin config set daemon.enabled true" in output
-    assert "atuin config set pty_proxy.enabled true" in output
-    assert "daemon.autostart" not in output.split("remediation:", 1)[1]
+    assert "atuin config enable output-capture" in output
+
+
+def test_doctor_does_not_require_daemon_autostart(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        doctor,
+        "inspect",
+        lambda: diagnostic(daemon_autostart=False),
+    )
+
+    assert doctor.doctor() == 0
+    output = capsys.readouterr().out
+    assert "daemon.autostart:  NO" in output
+    assert "PASS: Atuin history and Jerakeen daemon output" in output
 
 
 def test_doctor_reports_configured_but_inactive_pty_proxy(monkeypatch, capsys) -> None:
@@ -123,6 +138,14 @@ def test_verify_is_concise_pass_fail(monkeypatch, capsys) -> None:
     assert doctor.verify() == 1
     assert "pty-proxy is not active in this shell" in capsys.readouterr().out
 
+    monkeypatch.setattr(
+        doctor,
+        "inspect",
+        lambda: diagnostic(output_enabled=False),
+    )
+    assert doctor.verify() == 1
+    assert "command-output capture is not enabled" in capsys.readouterr().out
+
 
 def test_inspect_reads_history_before_starting_daemon_client(monkeypatch) -> None:
     calls: list[str] = []
@@ -143,5 +166,6 @@ def test_inspect_reads_history_before_starting_daemon_client(monkeypatch) -> Non
     monkeypatch.setattr(doctor, "daemon_info", daemon)
     result = doctor.inspect()
     assert result.latest == DEFAULT_LATEST
+    assert result.output_enabled is True
     assert result.pty_proxy_active is True
     assert calls == ["history", "daemon"]
