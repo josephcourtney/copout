@@ -49,13 +49,16 @@ class ClipboardWriter:
                 pass
 
         try:
-            self._process.communicate(timeout=1)
+            self._process.wait(timeout=1)
         except subprocess.TimeoutExpired:
             try:
                 self._process.kill()
             except OSError:
                 pass
-            self._process.communicate()
+            self._process.wait()
+        finally:
+            if self._process.stdin is not None:
+                self._process.stdin.close()
 
 
 def clipboard_command() -> list[str] | None:
