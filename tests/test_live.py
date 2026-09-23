@@ -39,10 +39,9 @@ def test_live_shell_capture() -> None:
         output.get("error") or "The real Atuin output cache did not capture the probe"
     )
 
-    # Atuin captures rendered terminal contents rather than raw stdout. Its VT100 renderer may
-    # discard the final newline and retain blank terminal cells as trailing spaces, so verify the
-    # visible probe text without rewriting the value Copout actually returns.
-    assert output["text"].replace("\r\n", "\n").rstrip(" \n") == "copout-live-probe"
+    # Atuin may retain terminal-cell padding and final blank rows in its rendered capture. Copout's
+    # default semantic mode removes whitespace only from the end of the complete capture.
+    assert output["text"] == "copout-live-probe"
 
 
 @_LIVE_ATUIN
