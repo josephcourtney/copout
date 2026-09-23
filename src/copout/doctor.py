@@ -16,6 +16,7 @@ class Diagnostic:
     daemon_enabled: bool | None = None
     daemon_autostart: bool | None = None
     pty_proxy_enabled: bool | None = None
+    output_enabled: bool | None = None
     pty_proxy_active: bool = False
     daemon: DaemonInfo | None = None
     daemon_error: str | None = None
@@ -63,6 +64,7 @@ def inspect() -> Diagnostic:
     daemon_enabled = _config_enabled(atuin_path, "daemon.enabled")
     daemon_autostart = _config_enabled(atuin_path, "daemon.autostart")
     pty_proxy_enabled = _config_enabled(atuin_path, "pty_proxy.enabled")
+    output_enabled = _config_enabled(atuin_path, "output.enabled")
 
     latest: HistoryEntry | None = None
     history_error: str | None = None
@@ -89,6 +91,7 @@ def inspect() -> Diagnostic:
         daemon_enabled=daemon_enabled,
         daemon_autostart=daemon_autostart,
         pty_proxy_enabled=pty_proxy_enabled,
+        output_enabled=output_enabled,
         pty_proxy_active=pty_proxy_active,
         daemon=daemon,
         daemon_error=daemon_error,
@@ -108,6 +111,8 @@ def _verification(result: Diagnostic) -> Verification:
         return Verification(False, "Atuin is not on PATH")
     if not result.session_present:
         return Verification(False, "ATUIN_SESSION is not set")
+    if result.output_enabled is not True:
+        return Verification(False, "Atuin command-output capture is not enabled")
     if not result.pty_proxy_active:
         return Verification(False, "pty-proxy is not active in this shell")
     if result.history_error is not None:
@@ -126,23 +131,10 @@ def _verification(result: Diagnostic) -> Verification:
     return Verification(True, "PASS")
 
 
-def _print_remediation(result: Diagnostic) -> None:
-    commands = [
-        command
-        for enabled, command in (
-            (result.daemon_enabled, "atuin config set daemon.enabled true"),
-            (result.daemon_autostart, "atuin config set daemon.autostart true"),
-            (result.pty_proxy_enabled, "atuin config set pty_proxy.enabled true"),
-        )
-        if enabled is not True
-    ]
-    if not commands:
-        return
-
+def _print_remediation() -> None:
     print("\nremediation:")
-    for command in commands:
-        print(f"  {command}")
-    print("\n  Open a new shell afterward, run a command, then run:")
+    print("  atuin config enable output-capture")
+    print("\n  Follow Atuin's restart instructions, open a new shell, run a command, then run:")
     print("    copout verify")
 
 
@@ -161,6 +153,7 @@ def doctor() -> int:
     print(f"  daemon.enabled:    {_state(result.daemon_enabled)}")
     print(f"  daemon.autostart:  {_state(result.daemon_autostart)}")
     print(f"  pty_proxy.enabled: {_state(result.pty_proxy_enabled)}")
+    print(f"  output.enabled:    {_state(result.output_enabled)}")
 
     print("\nruntime:")
     print(f"  pty-proxy active:  {'yes' if result.pty_proxy_active else 'NO'}")
@@ -196,18 +189,18 @@ def doctor() -> int:
         print("  Inspect `atuin history list --session` next.")
         return 4
 
-    configuration_complete = all(
+    capture_configured = all(
         value is True
         for value in (
             result.daemon_enabled,
-            result.daemon_autostart,
             result.pty_proxy_enabled,
+            result.output_enabled,
         )
     )
-    if not configuration_complete:
+    if not capture_configured:
         print("\ndiagnosis:")
         print("  PARTIAL: Atuin history works, but command-output capture is not fully configured.")
-        _print_remediation(result)
+        _print_remediation()
         return 5
 
     if not result.pty_proxy_active:
@@ -230,8 +223,8 @@ def doctor() -> int:
 
     if result.latest.output is None:
         print("\ndiagnosis:")
-        print("  PARTIAL: pty-proxy and the Atuin daemon are active, but command output")
-        print("  was not captured for the latest command.")
+        print("  PARTIAL: output capture, pty-proxy, and the Atuin daemon are enabled,")
+        print("  but command output was not captured for the latest command.")
         print("  Run a new command and rerun `copout verify`; if it still fails, inspect")
         print("  the pty-proxy capture path and OSC 133 shell markers.")
         return 5
