@@ -40,8 +40,8 @@ def _element(name: str, text: str, attrs: str = "") -> str:
 
 
 def _semantic_text(text: str) -> str:
-    """Remove terminal-end whitespace while preserving internal layout and SGR styling."""
-    return text.rstrip()
+    """Remove terminal-end ASCII whitespace while preserving internal layout and SGR styling."""
+    return text.rstrip(" \t\r\n")
 
 
 def _format_duration(seconds: float) -> str:
