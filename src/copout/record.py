@@ -5,7 +5,7 @@ from typing import Literal, TypedDict
 
 from .atuin import AtuinError, HistoryEntry, recent_entries
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 OutputState = Literal["captured", "unavailable"]
 OutputSource = Literal["atuin-pty-proxy", "atuin-history-only"]
