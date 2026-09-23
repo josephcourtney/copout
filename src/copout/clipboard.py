@@ -5,6 +5,62 @@ import subprocess
 import sys
 
 
+class ClipboardStartError(RuntimeError):
+    """Clipboard helper could not be started."""
+
+
+class ClipboardWriter:
+    """A pre-started clipboard helper that accepts one rendered payload."""
+
+    def __init__(self, process: subprocess.Popen[str]) -> None:
+        self._process = process
+        self._finished = False
+
+    def write(self, text: str) -> int:
+        if self._finished:
+            msg = "clipboard writer has already finished"
+            raise RuntimeError(msg)
+
+        try:
+            self._process.communicate(text)
+        except OSError as exc:
+            self.abort()
+            print(f"copout: clipboard helper I/O failed: {exc}", file=sys.stderr)
+            return 127
+
+        self._finished = True
+        returncode = self._process.returncode
+        if returncode is None:
+            returncode = self._process.wait()
+        if returncode != 0:
+            print(f"copout: clipboard helper exited with status {returncode}", file=sys.stderr)
+        return int(returncode)
+
+    def abort(self) -> None:
+        """Stop the helper without writing a clipboard payload."""
+        if self._finished:
+            return
+        self._finished = True
+
+        if self._process.poll() is None:
+            try:
+                self._process.terminate()
+            except OSError:
+                pass
+
+        try:
+            self._process.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            try:
+                self._process.kill()
+            except OSError:
+                pass
+            self._process.wait()
+        finally:
+            if self._process.stdin is not None:
+                self._process.stdin.close()
+
+
 def clipboard_command() -> list[str] | None:
     candidates = (
         ("pbcopy", ["pbcopy"]),
@@ -18,19 +74,14 @@ def clipboard_command() -> list[str] | None:
     return None
 
 
-def copy_to_clipboard(text: str) -> int:
+def start_clipboard_writer() -> ClipboardWriter:
     command = clipboard_command()
     if command is None:
-        print(
-            "copout: no clipboard helper found (tried pbcopy, wl-copy, xclip, xsel); use --print",
-            file=sys.stderr,
-        )
-        return 127
+        msg = "no clipboard helper found (tried pbcopy, wl-copy, xclip, xsel); use --print"
+        raise ClipboardStartError(msg)
+
     try:
-        proc = subprocess.run(command, input=text, text=True, check=False)
+        process = subprocess.Popen(command, stdin=subprocess.PIPE, text=True)
     except OSError as exc:
-        print(f"copout: failed to start clipboard helper: {exc}", file=sys.stderr)
-        return 127
-    if proc.returncode != 0:
-        print(f"copout: clipboard helper exited with status {proc.returncode}", file=sys.stderr)
-    return int(proc.returncode)
+        raise ClipboardStartError(f"failed to start clipboard helper: {exc}") from exc
+    return ClipboardWriter(process)
