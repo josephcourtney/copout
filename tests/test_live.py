@@ -39,8 +39,8 @@ def test_live_shell_capture() -> None:
         output.get("error") or "The real Atuin output cache did not capture the probe"
     )
 
-    # Atuin may retain terminal-cell padding and final blank rows in its rendered capture. Copout's
-    # default semantic mode removes whitespace only from the end of the complete capture.
+    # Atuin may retain terminal-cell padding and final blank rows in its capture. Copout removes
+    # whitespace only from the end of the complete captured output.
     assert output["text"] == "copout-live-probe"
 
 
