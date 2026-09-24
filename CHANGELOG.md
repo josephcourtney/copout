@@ -28,13 +28,11 @@
 - Start clipboard helpers before Jerakeen/gRPC access so normal clipboard delivery does not fork a new process after gRPC initialization; abort prestarted helpers without publishing an empty clipboard on retrieval failure.
 - Add a live regression test that exercises the real clipboard path and requires clean stderr after gRPC output retrieval.
 - Clarify that live-test probe commands must complete separately in the same shell session.
-- Advance output schema to version 5. Default semantic output removes terminal-end whitespace, uses compact XML, formats durations with explicit units, and recomputes semantic JSON byte counts.
-- Add `--rendered` to preserve Atuin's rendered output and verbose capture metadata exactly.
-- Reserve `--raw` for a future true PTY byte stream; currently report explicitly that Atuin's output API does not expose one.
+- Advance output schema to version 5. Output removes terminal-end whitespace, uses compact XML, formats durations with explicit units, and recomputes normalized JSON byte counts.
 - Preserve XML-invalid text reversibly with explicit JSON-string markers and retain daemon truncation and byte-count metadata in the internal/JSON record.
 - Bound daemon output and status requests to three seconds; retain history when output requests time out.
 - Reconcile contributor instructions with the documented history CLI and public Jerakeen API boundary.
-- Add XML round-trip, semantic/rendered presentation, truncation, stalled-service, and raw-mode regression tests.
+- Add XML round-trip, normalized-output, truncation, and stalled-service regression tests.
 
 ### Fixed
 
