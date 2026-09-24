@@ -36,11 +36,9 @@ copout verify
 ## Use
 
 ```console
-copout                 # compact semantic XML for the previous command
+copout                 # compact XML for the previous command
 copout -p              # print instead of clipboard
 copout --json          # JSON instead of XML
-copout --rendered      # preserve Atuin's rendered capture exactly
-copout --raw           # reserved: reports that Atuin does not expose raw PTY bytes
 copout -n 5            # last five commands in the current Atuin session
 copout --failure       # most recent failed command
 copout doctor          # detailed integration diagnostics
@@ -49,17 +47,11 @@ copout verify          # concise history + output assertion
 
 Copout retrieves persisted chronological history with `atuin history list --session` and retrieves recent captured output from the Atuin daemon through Jerakeen. It does not access Atuin's private database or implement the daemon gRPC protocol itself.
 
-### Output presentation modes
-
-The default mode is **semantic**. It is intended for pasting terminal context into an LLM or another human-readable destination. Copout removes whitespace only from the end of the complete captured output, which eliminates terminal-cell padding and final blank rows while preserving internal indentation, spacing, and blank lines. Default XML is compact: routine transport metadata such as history IDs for a single command, byte counts, and capture provenance are omitted. Durations are rendered with explicit units such as `102ms` or `2.5s`.
-
-`--rendered` preserves the text returned by Atuin exactly, including terminal padding and any SGR styling escapes that survived Atuin's terminal renderer. Rendered XML also includes the full capture metadata (`history_id`, `source`, `utf8_bytes`, `truncated`, `observed_bytes`, and `total_bytes`). Use this mode when exact compatibility with Atuin's stored rendered representation matters.
-
-`--raw` is reserved for a true original PTY byte stream. Atuin does not currently expose that stream through its output API: it stores a terminal-rendered representation instead. Consequently `copout --raw` exits with status 2 and explains the limitation. In particular, OSC sequences and other control traffic consumed by Atuin's terminal parser cannot be reconstructed after the fact. `--rendered` is the most faithful representation currently available.
+Copout is presentation-focused. It removes ASCII whitespace only from the end of the complete captured output, which eliminates terminal-cell padding and final blank rows while preserving internal indentation, spacing, blank lines, and any SGR styling that survives Atuin's capture. XML is compact: routine transport metadata such as a single command's history ID, byte counts, and capture provenance are omitted. Durations use explicit units such as `102ms` or `2.5s`.
 
 ## Testing
 
-Run `just check` for lint, formatting, typing, and the test suite. Command tests execute the installed `copout` launcher and module entry point in subprocesses, with a controlled Atuin executable, Jerakeen client, and clipboard helper. They cover selection, semantic and rendered output, unavailable output, service errors, diagnostics, clipboard delivery, and the reserved raw mode without modifying your clipboard or history.
+Run `just check` for lint, formatting, typing, and the test suite. Command tests execute the installed `copout` launcher and module entry point in subprocesses, with a controlled Atuin executable, Jerakeen client, and clipboard helper. They cover selection, normalized output, unavailable output, service errors, diagnostics, and clipboard delivery without modifying your clipboard or history.
 
 The real shell capture tests are opt-in. In an Atuin-integrated terminal with output capture enabled, run these as two separate commands:
 
@@ -73,13 +65,13 @@ Wait for the next shell prompt. Then run the tests separately in that same termi
 COPOUT_LIVE_ATUIN=1 .venv/bin/pytest -q tests/test_live.py
 ```
 
-The live semantic test requires the returned text to be exactly `copout-live-probe`, proving that terminal-end padding has been removed. The second live test exercises normal clipboard delivery and requires clean stderr after Jerakeen/gRPC output retrieval. The ordinary suite skips these tests; passing controlled command tests does not establish that your shell's Atuin capture is configured correctly.
+The live output test requires the returned text to be exactly `copout-live-probe`, proving that terminal-end padding has been removed. The second live test exercises normal clipboard delivery and requires clean stderr after Jerakeen/gRPC output retrieval. The ordinary suite skips these tests; passing controlled command tests does not establish that your shell's Atuin capture is configured correctly.
 
 ## Output format (schema version 5)
 
-Copout's internal record retains the complete Atuin metadata. JSON exposes that structured record. In default semantic JSON, `output.text` has terminal-end whitespace removed and `utf8_bytes` is recomputed from that semantic text; `observed_bytes` and `total_bytes` remain Atuin's original capture metadata. `--rendered --json` returns the unmodified Atuin-rendered text and its original byte counts.
+Copout's internal record retains Atuin capture metadata. JSON exposes that structured record after normalizing `output.text` by removing terminal-end ASCII whitespace; `utf8_bytes` is recomputed from the normalized text, while `observed_bytes` and `total_bytes` remain Atuin's original capture metadata.
 
-Default semantic XML is deliberately smaller. A typical command looks like:
+XML is deliberately smaller. A typical command looks like:
 
 ```xml
 <copout version="5">
@@ -94,7 +86,7 @@ For history captures, run history IDs remain present so commands can be distingu
 
 XML normally uses readable CDATA. If text contains XML-invalid characters (including ANSI escape codes), or carriage returns that XML parsing would normalize, the element has `encoding="json-string"` and its CDATA contains a JSON string literal. Parse the XML, then JSON-decode that element's text to recover the string. Attribute values that require this treatment have a companion marker such as `cwd_encoding="json-string"`.
 
-Atuin's command capture is rendered, mostly visible terminal output rather than a raw stdout or PTY byte stream. It may retain SGR escapes, but control bytes, OSC traffic, carriage returns, cursor movement, and some trailing newlines may be consumed or normalized before Copout receives the text.
+Atuin's command capture is a terminal-rendered representation. Copout consumes that representation and does not attempt to intercept or reconstruct the underlying PTY stream or terminal input.
 
 Daemon connection establishment, individual output requests, and status requests each have a three-second deadline. An unavailable or timed-out output request leaves usable history with output marked unavailable. A timed-out status request is reported by `copout doctor` and `copout verify`.
 
