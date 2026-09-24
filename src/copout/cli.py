@@ -17,14 +17,7 @@ app = typer.Typer(
 )
 
 
-def run(
-    *,
-    print_output: bool,
-    as_json: bool,
-    count: int,
-    failure: bool,
-    output_mode: render.OutputMode = "semantic",
-) -> int:
+def run(*, print_output: bool, as_json: bool, count: int, failure: bool) -> int:
     writer: clipboard.ClipboardWriter | None = None
     if not print_output:
         try:
@@ -45,7 +38,7 @@ def run(
             print("copout: run `copout doctor` for diagnostics", file=sys.stderr)
             return 3
 
-        rendered = render.render(captured, as_json=as_json, mode=output_mode)
+        rendered = render.render(captured, as_json=as_json)
         if writer is None:
             sys.stdout.write(rendered)
             return 0
@@ -62,20 +55,6 @@ def cli(
         bool, typer.Option("--print", "-p", help="Print instead of copying.")
     ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON instead of XML.")] = False,
-    rendered_output: Annotated[
-        bool,
-        typer.Option(
-            "--rendered",
-            help="Preserve Atuin's rendered output exactly, including terminal padding and SGR escapes.",
-        ),
-    ] = False,
-    raw_output: Annotated[
-        bool,
-        typer.Option(
-            "--raw",
-            help="Request the original PTY byte stream (not currently exposed by Atuin).",
-        ),
-    ] = False,
     last: Annotated[
         int, typer.Option("--last", "-n", min=1, help="Include the last N commands.")
     ] = 1,
@@ -87,22 +66,7 @@ def cli(
     """Copy recent Atuin command history and captured output."""
     if ctx.invoked_subcommand is not None:
         return
-    if raw_output:
-        print(
-            "copout: --raw is unavailable because Atuin does not expose the original PTY byte stream; use --rendered for the exact rendered capture",
-            file=sys.stderr,
-        )
-        raise typer.Exit(2)
-    output_mode: render.OutputMode = "rendered" if rendered_output else "semantic"
-    raise typer.Exit(
-        run(
-            print_output=print_output,
-            as_json=as_json,
-            count=last,
-            failure=failure,
-            output_mode=output_mode,
-        )
-    )
+    raise typer.Exit(run(print_output=print_output, as_json=as_json, count=last, failure=failure))
 
 
 @app.command("doctor")
