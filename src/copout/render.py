@@ -3,11 +3,8 @@ from __future__ import annotations
 import copy
 import html
 import json
-from typing import Literal
 
 from .record import CopoutRecord, RunRecord
-
-type OutputMode = Literal["semantic", "rendered"]
 
 
 def _encoded_text(text: str, *, attribute: bool = False) -> tuple[str, bool]:
@@ -69,14 +66,13 @@ def _semantic_record(record: CopoutRecord) -> CopoutRecord:
 def _render_run(
     run: RunRecord,
     *,
-    mode: OutputMode,
     include_history_id: bool,
     indent: str = "  ",
 ) -> list[str]:
     output = run["output"]
     attrs: list[str] = []
 
-    if mode == "rendered" or include_history_id:
+    if include_history_id:
         attrs.append(_attribute("history_id", run["history_id"]))
     if (status := run["result"]["status"]) is not None:
         attrs.append(_attribute("status", status))
@@ -93,52 +89,24 @@ def _render_run(
     lines.append(f"{indent}  {_element('command', run['command'])}")
 
     output_attrs: list[str] = []
-    if mode == "rendered":
-        output_attrs.extend(
-            (
-                _attribute("state", output["state"]),
-                _attribute("source", output["source"]),
-                _attribute("utf8_bytes", output["utf8_bytes"]),
-            )
-        )
-        if output["error"] is not None:
-            output_attrs.append(_attribute("error", output["error"]))
-        for key in ("truncated", "observed_bytes", "total_bytes"):
-            value = output[key]
-            if value is not None:
-                output_attrs.append(
-                    _attribute(key, str(value).lower() if isinstance(value, bool) else value)
-                )
-        text = output["text"]
-    else:
-        if output["state"] == "unavailable":
-            output_attrs.append(_attribute("state", "unavailable"))
-        if output["truncated"]:
-            output_attrs.append(_attribute("truncated", "true"))
-        if output["error"] is not None:
-            output_attrs.append(_attribute("error", output["error"]))
-        text = _semantic_text(output["text"])
+    if output["state"] == "unavailable":
+        output_attrs.append(_attribute("state", "unavailable"))
+    if output["truncated"]:
+        output_attrs.append(_attribute("truncated", "true"))
+    if output["error"] is not None:
+        output_attrs.append(_attribute("error", output["error"]))
 
     attr_text = f" {' '.join(output_attrs)}" if output_attrs else ""
-    lines.append(f"{indent}  {_element('output', text, attr_text)}")
+    lines.append(f"{indent}  {_element('output', _semantic_text(output['text']), attr_text)}")
     lines.append(f"{indent}</run>")
     return lines
 
 
-def render(
-    record: CopoutRecord,
-    *,
-    as_json: bool = False,
-    mode: OutputMode = "semantic",
-) -> str:
+def render(record: CopoutRecord, *, as_json: bool = False) -> str:
     if as_json:
-        payload = record if mode == "rendered" else _semantic_record(record)
-        return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+        return json.dumps(_semantic_record(record), indent=2, ensure_ascii=False) + "\n"
 
     attrs = [_attribute("version", record["version"])]
-    if mode == "rendered":
-        attrs.append(_attribute("source", record["source"]))
-
     runs: list[RunRecord]
     include_history_id = record["scope"] == "history"
     if record["scope"] == "history":
@@ -149,12 +117,6 @@ def render(
 
     lines = [f"<copout {' '.join(attrs)}>"]
     for run in runs:
-        lines.extend(
-            _render_run(
-                run,
-                mode=mode,
-                include_history_id=include_history_id,
-            )
-        )
+        lines.extend(_render_run(run, include_history_id=include_history_id))
     lines.append("</copout>")
     return "\n".join(lines) + "\n"
