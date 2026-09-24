@@ -64,7 +64,7 @@ def test_build_history_reports_output_count_without_redundant_capture_metadata(m
     ]
 
 
-def test_render_json_uses_semantic_output_by_default(monkeypatch) -> None:
+def test_render_json_uses_semantic_output(monkeypatch) -> None:
     monkeypatch.setattr(
         record,
         "recent_entries",
@@ -77,18 +77,6 @@ def test_render_json_uses_semantic_output_by_default(monkeypatch) -> None:
     assert payload["source"] == "atuin"
     assert payload["output"]["text"] == "hi"
     assert payload["output"]["utf8_bytes"] == 2
-
-
-def test_rendered_json_preserves_atuin_output(monkeypatch) -> None:
-    original = "hi\n   "
-    monkeypatch.setattr(
-        record,
-        "recent_entries",
-        lambda count: [HistoryEntry("id1", "echo hi", "/tmp", 0, 0.1, "", original)],
-    )
-    payload = json.loads(render.render(record.build_record(), as_json=True, mode="rendered"))
-    assert payload["output"]["text"] == original
-    assert payload["output"]["utf8_bytes"] == len(original.encode())
 
 
 def test_render_xml_is_compact_semantic_context(monkeypatch) -> None:
@@ -109,40 +97,6 @@ def test_render_xml_is_compact_semantic_context(monkeypatch) -> None:
     assert output is not None
     assert output.attrib == {}
     assert output.text == "<x>"
-
-
-def test_rendered_xml_preserves_capture_metadata(monkeypatch) -> None:
-    original = "hello\n   "
-    monkeypatch.setattr(
-        record,
-        "recent_entries",
-        lambda count: [
-            HistoryEntry(
-                "id1",
-                "printf 'hello\\n'",
-                "/tmp",
-                0,
-                0.1,
-                "",
-                original,
-                output_truncated=False,
-                output_observed_bytes=275,
-                output_total_bytes=len(original.encode()),
-            )
-        ],
-    )
-    root = ElementTree.fromstring(render.render(record.build_record(), mode="rendered"))
-    assert root.attrib == {"version": "5", "source": "atuin"}
-    run = root.find("run")
-    assert run is not None
-    assert run.attrib["history_id"] == "id1"
-    output = run.find("output")
-    assert output is not None
-    assert output.text == original
-    assert output.attrib["state"] == "captured"
-    assert output.attrib["source"] == "atuin-pty-proxy"
-    assert output.attrib["utf8_bytes"] == str(len(original.encode()))
-    assert output.attrib["observed_bytes"] == "275"
 
 
 def test_xml_round_trips_controls_and_attribute_whitespace(monkeypatch) -> None:
