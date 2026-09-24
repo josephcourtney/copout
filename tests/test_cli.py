@@ -37,10 +37,10 @@ def test_help_is_available_with_short_option() -> None:
     assert "Copy recent structured terminal history from Atuin" in result.stdout
     assert "--print" in result.stdout
     assert "--json" in result.stdout
-    assert "--rendered" in result.stdout
-    assert "--raw" in result.stdout
     assert "--last" in result.stdout
     assert "--failure" in result.stdout
+    assert "--rendered" not in result.stdout
+    assert "--raw" not in result.stdout
 
 
 def test_help_is_available_with_long_option() -> None:
@@ -86,11 +86,7 @@ def test_clipboard_helper_starts_before_record_build(monkeypatch) -> None:
 
     monkeypatch.setattr(cli.clipboard, "start_clipboard_writer", start_writer)
     monkeypatch.setattr(cli.record, "build_record", build_record)
-    monkeypatch.setattr(
-        cli.render,
-        "render",
-        lambda captured, *, as_json, mode: "payload",
-    )
+    monkeypatch.setattr(cli.render, "render", lambda captured, *, as_json: "payload")
 
     result = runner.invoke(cli.app)
 
@@ -147,41 +143,6 @@ def test_print_writes_semantic_result_to_stdout(monkeypatch) -> None:
     assert result.stdout.startswith('<copout version="5"')
     assert 'source="atuin"' not in result.stdout
     assert "<![CDATA[echo hi]]>" in result.stdout
-
-
-def test_rendered_flag_selects_rendered_mode(monkeypatch) -> None:
-    monkeypatch.setattr(cli.record, "build_record", _record_fixture)
-    modes: list[str] = []
-
-    def fake_render(captured, *, as_json: bool, mode: str) -> str:
-        modes.append(mode)
-        return "payload"
-
-    monkeypatch.setattr(cli.render, "render", fake_render)
-
-    result = runner.invoke(cli.app, ["--print", "--rendered"])
-
-    assert result.exit_code == 0
-    assert result.stdout == "payload"
-    assert modes == ["rendered"]
-
-
-def test_raw_rejects_before_accessing_services(monkeypatch) -> None:
-    def must_not_build() -> dict:
-        raise AssertionError("raw mode must reject before Atuin access")
-
-    def must_not_start():
-        raise AssertionError("raw mode must reject before clipboard access")
-
-    monkeypatch.setattr(cli.record, "build_record", must_not_build)
-    monkeypatch.setattr(cli.clipboard, "start_clipboard_writer", must_not_start)
-
-    result = runner.invoke(cli.app, ["--raw"])
-
-    assert result.exit_code == 2
-    assert result.stdout == ""
-    assert "Atuin does not expose the original PTY byte stream" in result.stderr
-    assert "--rendered" in result.stderr
 
 
 def test_json_print_emits_valid_json(monkeypatch) -> None:
