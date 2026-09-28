@@ -63,16 +63,9 @@ class Client:
             raise RuntimeError("output unavailable")
         text = json.loads(os.environ["OUTPUTS"]).get(history_id)
         return None if text is None else SimpleNamespace(
-            text=text,
-            truncated=os.environ.get("TRUNCATED") == "1",
+            text=text, truncated=os.environ.get("TRUNCATED") == "1",
             observed_bytes=int(os.environ.get("OBSERVED_BYTES", len(text.encode()))),
-            total_bytes=len(text.encode()),
-            exit_capture_complete=(
-                None
-                if "EXIT_CAPTURE_COMPLETE" not in os.environ
-                else os.environ["EXIT_CAPTURE_COMPLETE"] == "1"
-            ),
-        )
+            total_bytes=len(text.encode()))
 
     async def status(self):
         if os.environ.get("STATUS_STALL"):
@@ -143,7 +136,6 @@ def command_env(tmp_path: Path) -> CommandEnvironment:
         "CLIPBOARD_STATUS",
         "TRUNCATED",
         "OBSERVED_BYTES",
-        "EXIT_CAPTURE_COMPLETE",
         "OUTPUT_STALL",
         "OUTPUT_UNSUPPORTED",
         "STATUS_STALL",
@@ -332,22 +324,6 @@ def test_truncated_output_metadata(command_env: CommandEnvironment, as_json: boo
             "observed_bytes": "10000",
             "total_bytes": str(len("héllo\n".encode())),
         }
-
-
-def test_incomplete_exit_capture_metadata(command_env: CommandEnvironment) -> None:
-    command_env.env["EXIT_CAPTURE_COMPLETE"] = "0"
-    result = command_env.run("--print")
-    assert result.returncode == 0, result.stderr
-
-    output = ElementTree.fromstring(result.stdout).find("run/output")
-
-    assert output is not None
-    assert output.attrib == {
-        "captured_bytes": str(len("héllo".encode())),
-        "observed_bytes": str(len("héllo\n".encode())),
-        "total_bytes": str(len("héllo\n".encode())),
-        "exit_capture_complete": "false",
-    }
 
 
 def test_xml_keeps_ansi_but_trims_terminal_end_whitespace(
