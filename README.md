@@ -1,6 +1,6 @@
 # Copout
 
-Copout copies recent terminal history into the clipboard as compact XML or JSON. Atuin is the source of truth for command history and metadata; Atuin's daemon plus `pty-proxy` supply recent command output. Copout uses Atuin's documented history CLI for persisted session history and Jerakeen for direct daemon access to captured output.
+Copout copies recent terminal history into the clipboard as compact XML, JSON, or readable Markdown. Atuin is the source of truth for command history and metadata; Atuin's daemon plus `pty-proxy` supply recent command output. Copout uses Atuin's documented history CLI for persisted session history and Jerakeen for direct daemon access to captured output.
 
 Copout does **not** run a terminal watcher, maintain its own command journal, or modify shell or Atuin configuration.
 
@@ -39,6 +39,8 @@ copout verify
 copout                  # compact XML for the previous command
 copout -p               # print instead of clipboard
 copout --json           # JSON instead of XML
+copout --markdown       # Markdown with fenced commands and output
+copout pick 1 3 --markdown -p # print selected commands as Markdown
 copout --pretty-attributes # put multiple XML attributes on separate lines
 copout -n 5             # last five commands in the current Atuin session
 copout --failure        # most recent failed command

@@ -32,11 +32,13 @@ def _write_record(
     *,
     writer: clipboard.ClipboardWriter | None,
     as_json: bool,
+    as_markdown: bool,
     pretty_attributes: bool,
 ) -> int:
     rendered = render.render(
         captured,
         as_json=as_json,
+        as_markdown=as_markdown,
         pretty_attributes=pretty_attributes,
     )
     if writer is None:
@@ -55,6 +57,7 @@ def run(
     *,
     print_output: bool,
     as_json: bool,
+    as_markdown: bool,
     pretty_attributes: bool,
     count: int,
     failure: bool,
@@ -76,6 +79,7 @@ def run(
             captured,
             writer=writer,
             as_json=as_json,
+            as_markdown=as_markdown,
             pretty_attributes=pretty_attributes,
         )
     finally:
@@ -96,6 +100,7 @@ def run_pick(
     limit: int,
     print_output: bool,
     as_json: bool,
+    as_markdown: bool,
     pretty_attributes: bool,
 ) -> int:
     try:
@@ -125,6 +130,7 @@ def run_pick(
             captured,
             writer=writer,
             as_json=as_json,
+            as_markdown=as_markdown,
             pretty_attributes=pretty_attributes,
         )
     finally:
@@ -139,6 +145,9 @@ def cli(
         bool, typer.Option("--print", "-p", help="Print instead of copying.")
     ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON instead of XML.")] = False,
+    as_markdown: Annotated[
+        bool, typer.Option("--markdown", help="Emit readable Markdown instead of XML.")
+    ] = False,
     pretty_attributes: Annotated[
         bool,
         typer.Option(
@@ -157,10 +166,13 @@ def cli(
     """Copy recent Atuin command history and captured output."""
     if ctx.invoked_subcommand is not None:
         return
+    if as_json and as_markdown:
+        raise typer.BadParameter("--json and --markdown cannot be combined")
     raise typer.Exit(
         run(
             print_output=print_output,
             as_json=as_json,
+            as_markdown=as_markdown,
             pretty_attributes=pretty_attributes,
             count=last,
             failure=failure,
@@ -182,6 +194,9 @@ def pick_command(
         bool, typer.Option("--print", "-p", help="Print instead of copying.")
     ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON instead of XML.")] = False,
+    as_markdown: Annotated[
+        bool, typer.Option("--markdown", help="Emit readable Markdown instead of XML.")
+    ] = False,
     pretty_attributes: Annotated[
         bool,
         typer.Option(
@@ -191,12 +206,15 @@ def pick_command(
     ] = False,
 ) -> None:
     """Choose arbitrary recent commands and copy them as one history record."""
+    if as_json and as_markdown:
+        raise typer.BadParameter("--json and --markdown cannot be combined")
     raise typer.Exit(
         run_pick(
             selectors=selectors or [],
             limit=limit,
             print_output=print_output,
             as_json=as_json,
+            as_markdown=as_markdown,
             pretty_attributes=pretty_attributes,
         )
     )

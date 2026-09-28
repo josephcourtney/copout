@@ -202,3 +202,27 @@ def test_unavailable_capture_metadata_is_unknown(monkeypatch) -> None:
     assert output["observed_bytes"] is None
     assert output["total_bytes"] is None
     assert "exit_capture_complete" not in output
+
+
+def test_markdown_uses_safe_fences_and_reports_output_states() -> None:
+    entries = [
+        HistoryEntry("1", "printf '```'", "/tmp/`\nnext", 0, 0.1, output="a\n````\nb"),
+        HistoryEntry("2", "false", output=None, output_error="daemon\nfailed"),
+        HistoryEntry("3", "build", output="partial", output_truncated=True),
+    ]
+    markdown = render.render(record.build_history_from_entries(entries), as_markdown=True)
+
+    assert "`````\na\n````\nb\n`````" in markdown
+    assert 'cwd ``"/tmp/`\\nnext"``' in markdown
+    assert "Output unavailable." in markdown
+    assert 'Output retrieval error: `"daemon\\nfailed"`' in markdown
+    assert "Note: Atuin truncated the captured output." in markdown
+    assert markdown.index("### Run 1") < markdown.index("### Run 2")
+
+
+def test_markdown_reports_presentation_truncation() -> None:
+    entry = HistoryEntry("1", "build", output="x" * (render.MAX_OUTPUT_BYTES_PER_RUN + 100))
+    markdown = render.render(record.build_history_from_entries([entry]), as_markdown=True)
+
+    assert "Note: Copout omitted " in markdown
+    assert "[copout omitted" in markdown

@@ -61,6 +61,18 @@ def test_pick_explicit_selectors_are_noninteractive(monkeypatch) -> None:
     assert "middle" not in result.stdout
 
 
+def test_pick_markdown_output(monkeypatch) -> None:
+    entries = [HistoryEntry("2", "newest", output="new"), HistoryEntry("1", "oldest")]
+    monkeypatch.setattr(cli.atuin, "recent_history", lambda limit: entries)
+    monkeypatch.setattr(cli.atuin, "hydrate_outputs", lambda selected: selected)
+
+    result = runner.invoke(cli.app, ["pick", "1-2", "--markdown", "--print"])
+
+    assert result.exit_code == 0, result.stderr
+    assert result.stdout.index("oldest") < result.stdout.index("newest")
+    assert "Output unavailable." in result.stdout
+
+
 def test_pick_without_selectors_uses_inline_picker(monkeypatch) -> None:
     entries = [HistoryEntry("2", "newest"), HistoryEntry("1", "oldest")]
     monkeypatch.setattr(cli.atuin, "recent_history", lambda limit: entries)

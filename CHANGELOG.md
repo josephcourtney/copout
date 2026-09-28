@@ -22,6 +22,7 @@
 
 ### Added
 
+- Add `--markdown` output for commands and picked history, with safe fences and capture notes.
 - Add `copout pick` for arbitrary recent-command selection. Selectors are 1-based newest-first offsets and support inclusive ranges such as `2-4`; selected runs are emitted chronologically.
 - Replace the line-oriented interactive picker with a bounded Textual inline checklist: navigate a scrollable history, toggle commands with Space, confirm the accumulated selection with Enter, and cancel with Esc or `q` without touching the clipboard.
 - Increase the default interactive candidate window from 20 to 100 commands now that candidates scroll within a fixed-height picker.

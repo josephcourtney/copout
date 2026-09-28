@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import html
 import json
+import re
 
 from .record import CopoutRecord, OutputRecord, RunRecord
 
@@ -243,13 +244,61 @@ def _render_run(
     return lines
 
 
+def _fence(text: str, language: str = "") -> str:
+    longest = max((len(match.group()) for match in re.finditer(r"`+", text)), default=0)
+    marker = "`" * max(3, longest + 1)
+    return f"{marker}{language}\n{text}\n{marker}"
+
+
+def _inline_value(value: str) -> str:
+    # JSON quoting keeps newlines and controls from changing Markdown structure.
+    quoted = json.dumps(value, ensure_ascii=True)
+    longest = max((len(match.group()) for match in re.finditer(r"`+", quoted)), default=0)
+    marker = "`" * (longest + 1)
+    return f"{marker}{quoted}{marker}"
+
+
+def _render_markdown(record: CopoutRecord) -> str:
+    lines: list[str] = []
+    for index, run in enumerate(_record_runs(record), start=1):
+        if lines:
+            lines.append("")
+        lines.append(f"### Run {index}" if record["scope"] == "history" else "### Command")
+        details: list[str] = []
+        if (status := run["result"]["status"]) is not None:
+            details.append(f"exit {status}")
+        if cwd := run["context"]["cwd"]:
+            details.append(f"cwd {_inline_value(cwd)}")
+        if (duration := run["timing"]["duration"]) is not None:
+            details.append(f"{_duration_ms(duration)} ms")
+        if details:
+            lines.extend(("", " · ".join(details)))
+        lines.extend(("", "Command:", "", _fence(run["command"], "console")))
+        output = run["output"]
+        if output["state"] == "captured":
+            lines.extend(("", "Output:", "", _fence(output["text"])))
+        else:
+            lines.extend(("", "Output unavailable."))
+        if output["truncated"]:
+            lines.extend(("", "Note: Atuin truncated the captured output."))
+        if output.get("presentation_truncated"):
+            omitted = output.get("presentation_omitted_bytes", 0)
+            lines.extend(("", f"Note: Copout omitted {omitted} output bytes."))
+        if output["error"]:
+            lines.extend(("", f"Output retrieval error: {_inline_value(output['error'])}"))
+    return "\n".join(lines) + "\n"
+
+
 def render(
     record: CopoutRecord,
     *,
     as_json: bool = False,
+    as_markdown: bool = False,
     pretty_attributes: bool = False,
 ) -> str:
     projected = _semantic_record(record)
+    if as_markdown:
+        return _render_markdown(projected)
     if as_json:
         return json.dumps(projected, indent=2, ensure_ascii=False) + "\n"
 
