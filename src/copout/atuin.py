@@ -158,7 +158,6 @@ async def _add_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
                 output=output.text,
                 output_truncated=output.truncated,
                 output_observed_bytes=output.observed_bytes,
-                output_total_bytes=output.total_bytes,
             )
 
         return list(await asyncio.gather(*(populate(entry) for entry in entries)))
