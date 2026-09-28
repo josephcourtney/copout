@@ -24,8 +24,8 @@ def parse_selectors(tokens: Sequence[str], *, available: int) -> list[int]:
 
     selected: set[int] = set()
     for token in tokens:
-        for part in token.split(","):
-            part = part.strip()
+        for raw_part in token.split(","):
+            part = raw_part.strip()
             if not part:
                 raise SelectionError(f"invalid empty selector in {token!r}")
             if "-" in part:
