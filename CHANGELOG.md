@@ -35,10 +35,11 @@
 - Report unsupported output RPCs and other retrieval errors instead of treating every failure as a missing capture.
 - Read CLI history before opening daemon clients during diagnostics, avoiding subprocess forks after gRPC initialization.
 - Start clipboard helpers before Jerakeen/gRPC access so normal clipboard delivery does not fork a new process after gRPC initialization; abort prestarted helpers without publishing an empty clipboard on retrieval failure.
-- Add a live regression test that exercises the real clipboard path and requires clean stderr after gRPC output retrieval.
+- Add a live regression test that exercises the real clipboard path and requires clean stderr after Jerakeen/gRPC output retrieval.
 - Clarify that live-test probe commands must complete separately in the same shell session.
 - Advance output schema to version 6: remove the redundant root `selected` attribute, replace human-formatted duration strings with integer `duration_ms`, rename normalized byte counts to `captured_bytes`, formalize the XML text/`json-string` encoding contract, and expose sparse extended capture metadata only when needed.
 - Support sparse `state`, `encoding`, `truncated`, `captured_bytes`, `observed_bytes`, `total_bytes`, and upstream `exit_capture_complete` output metadata while keeping ordinary complete `<output>` elements attribute-free.
+- Reserve schema `total_bytes` for a true complete-output size; Atuin's stored-rendered-output byte count is intentionally not mapped to that field.
 - Bound presented output for multi-run history records to 128 KiB per run and 512 KiB overall, preserving useful head and tail context with an explicit omission marker. Bare single-command output remains unbounded by Copout.
 - Preserve XML-invalid text reversibly with explicit JSON-string markers and retain daemon truncation and byte-count metadata in the internal/JSON record.
 - Bound daemon output and status requests to three seconds; retain history when output requests time out.
