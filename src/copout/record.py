@@ -5,7 +5,7 @@ from typing import Literal, NotRequired, TypedDict
 
 from .atuin import AtuinError, HistoryEntry, recent_entries
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 OutputState = Literal["captured", "unavailable"]
 OutputSource = Literal["atuin-pty-proxy", "atuin-history-only"]
@@ -19,11 +19,12 @@ class OutputRecord(TypedDict):
     state: OutputState
     source: OutputSource
     text: str
-    utf8_bytes: int
+    captured_bytes: int
     truncated: bool | None
     observed_bytes: int | None
     total_bytes: int | None
     error: str | None
+    exit_capture_complete: NotRequired[bool]
     presentation_truncated: NotRequired[bool]
     presentation_omitted_bytes: NotRequired[int]
 
@@ -89,20 +90,24 @@ def _metadata() -> CaptureMetadata:
 def _entry_record(entry: HistoryEntry) -> RunRecord:
     captured = entry.output is not None
     text = entry.output or ""
+    output: OutputRecord = {
+        "state": "captured" if captured else "unavailable",
+        "error": entry.output_error,
+        "source": "atuin-pty-proxy" if captured else "atuin-history-only",
+        "text": text,
+        "captured_bytes": len(text.encode()),
+        "truncated": entry.output_truncated if captured else None,
+        "observed_bytes": entry.output_observed_bytes if captured else None,
+        "total_bytes": entry.output_total_bytes if captured else None,
+    }
+    if captured and entry.output_exit_capture_complete is not None:
+        output["exit_capture_complete"] = entry.output_exit_capture_complete
+
     return {
         "history_id": entry.id,
         "command": entry.command,
         "result": {"status": entry.exit_status},
-        "output": {
-            "state": "captured" if captured else "unavailable",
-            "error": entry.output_error,
-            "source": "atuin-pty-proxy" if captured else "atuin-history-only",
-            "text": text,
-            "utf8_bytes": len(text.encode()),
-            "truncated": entry.output_truncated if captured else None,
-            "observed_bytes": entry.output_observed_bytes if captured else None,
-            "total_bytes": entry.output_total_bytes if captured else None,
-        },
+        "output": output,
         "context": {"cwd": entry.cwd},
         "timing": {"duration": entry.duration, "recorded_at": entry.timestamp},
     }
