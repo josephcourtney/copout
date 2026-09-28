@@ -121,7 +121,6 @@ def test_add_outputs_uses_protocol3_history_service(monkeypatch: pytest.MonkeyPa
             output="captured\n",
             output_truncated=True,
             output_observed_bytes=24,
-            output_total_bytes=9,
         )
     ]
 
