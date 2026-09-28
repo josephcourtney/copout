@@ -9,7 +9,7 @@ runner = CliRunner()
 
 def _record_fixture() -> dict:
     return {
-        "version": 5,
+        "version": 6,
         "scope": "command",
         "source": "atuin",
         "history_id": "abc",
@@ -20,7 +20,7 @@ def _record_fixture() -> dict:
             "error": None,
             "source": "atuin-pty-proxy",
             "text": "hi\n",
-            "utf8_bytes": 3,
+            "captured_bytes": 3,
             "truncated": False,
             "observed_bytes": 3,
             "total_bytes": 3,
@@ -37,6 +37,7 @@ def test_help_is_available_with_short_option() -> None:
     assert "Copy recent structured terminal history from Atuin" in result.stdout
     assert "--print" in result.stdout
     assert "--json" in result.stdout
+    assert "--pretty-attributes" in result.stdout
     assert "--last" in result.stdout
     assert "--failure" in result.stdout
     assert "--rendered" not in result.stdout
@@ -86,7 +87,11 @@ def test_clipboard_helper_starts_before_record_build(monkeypatch) -> None:
 
     monkeypatch.setattr(cli.clipboard, "start_clipboard_writer", start_writer)
     monkeypatch.setattr(cli.record, "build_record", build_record)
-    monkeypatch.setattr(cli.render, "render", lambda captured, *, as_json: "payload")
+    monkeypatch.setattr(
+        cli.render,
+        "render",
+        lambda captured, *, as_json, pretty_attributes: "payload",
+    )
 
     result = runner.invoke(cli.app)
 
@@ -140,9 +145,18 @@ def test_print_writes_semantic_result_to_stdout(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert result.stderr == ""
-    assert result.stdout.startswith('<copout version="5"')
+    assert result.stdout.startswith('<copout version="6"')
     assert 'source="atuin"' not in result.stdout
     assert "<![CDATA[echo hi]]>" in result.stdout
+
+
+def test_pretty_attributes_is_opt_in(monkeypatch) -> None:
+    monkeypatch.setattr(cli.record, "build_record", _record_fixture)
+
+    result = runner.invoke(cli.app, ["--print", "--pretty-attributes"])
+
+    assert result.exit_code == 0, result.stderr
+    assert '<run\n    status="0"\n    cwd="/tmp"\n    duration_ms="10">' in result.stdout
 
 
 def test_json_print_emits_valid_json(monkeypatch) -> None:
