@@ -44,8 +44,8 @@ class HistoryEntry:
     output_truncated: bool | None = None
     output_observed_bytes: int | None = None
     output_total_bytes: int | None = None
-    output_exit_capture_complete: bool | None = None
     output_error: str | None = None
+    output_exit_capture_complete: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
