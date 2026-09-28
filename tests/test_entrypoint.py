@@ -63,9 +63,16 @@ class Client:
             raise RuntimeError("output unavailable")
         text = json.loads(os.environ["OUTPUTS"]).get(history_id)
         return None if text is None else SimpleNamespace(
-            text=text, truncated=os.environ.get("TRUNCATED") == "1",
+            text=text,
+            truncated=os.environ.get("TRUNCATED") == "1",
             observed_bytes=int(os.environ.get("OBSERVED_BYTES", len(text.encode()))),
-            total_bytes=len(text.encode()))
+            total_bytes=len(text.encode()),
+            exit_capture_complete=(
+                None
+                if "EXIT_CAPTURE_COMPLETE" not in os.environ
+                else os.environ["EXIT_CAPTURE_COMPLETE"] == "1"
+            ),
+        )
 
     async def status(self):
         if os.environ.get("STATUS_STALL"):
@@ -136,6 +143,7 @@ def command_env(tmp_path: Path) -> CommandEnvironment:
         "CLIPBOARD_STATUS",
         "TRUNCATED",
         "OBSERVED_BYTES",
+        "EXIT_CAPTURE_COMPLETE",
         "OUTPUT_STALL",
         "OUTPUT_UNSUPPORTED",
         "STATUS_STALL",
@@ -178,9 +186,9 @@ def test_command_copies_to_helper(command_env: CommandEnvironment) -> None:
     assert result.returncode == 0, result.stderr
     assert result.stdout == result.stderr == ""
     copied = command_env.clipboard.read_text()
-    assert copied.startswith('<copout version="5"')
+    assert copied.startswith('<copout version="6"')
     assert "<![CDATA[héllo]]>" in copied
-    assert "utf8_bytes" not in copied
+    assert "captured_bytes" not in copied
     assert 'source="atuin"' not in copied
 
 
@@ -272,6 +280,7 @@ def test_command_help_needs_no_services(command_env: CommandEnvironment, flag: s
     result = command_env.run(flag)
     assert result.returncode == 0, result.stderr
     assert "--print" in result.stdout
+    assert "--pretty-attributes" in result.stdout
     assert "--rendered" not in result.stdout
     assert "--raw" not in result.stdout
 
@@ -313,11 +322,32 @@ def test_truncated_output_metadata(command_env: CommandEnvironment, as_json: boo
         assert output["truncated"] is True
         assert output["observed_bytes"] == 10000
         assert output["total_bytes"] == len("héllo\n".encode())
-        assert output["utf8_bytes"] == len("héllo".encode())
+        assert output["captured_bytes"] == len("héllo".encode())
     else:
         output_element = ElementTree.fromstring(result.stdout).find("run/output")
         assert output_element is not None
-        assert output_element.attrib == {"truncated": "true"}
+        assert output_element.attrib == {
+            "truncated": "true",
+            "captured_bytes": str(len("héllo".encode())),
+            "observed_bytes": "10000",
+            "total_bytes": str(len("héllo\n".encode())),
+        }
+
+
+def test_incomplete_exit_capture_metadata(command_env: CommandEnvironment) -> None:
+    command_env.env["EXIT_CAPTURE_COMPLETE"] = "0"
+    result = command_env.run("--print")
+    assert result.returncode == 0, result.stderr
+
+    output = ElementTree.fromstring(result.stdout).find("run/output")
+
+    assert output is not None
+    assert output.attrib == {
+        "captured_bytes": str(len("héllo".encode())),
+        "observed_bytes": str(len("héllo\n".encode())),
+        "total_bytes": str(len("héllo\n".encode())),
+        "exit_capture_complete": "false",
+    }
 
 
 def test_xml_keeps_ansi_but_trims_terminal_end_whitespace(
