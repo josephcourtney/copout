@@ -68,7 +68,7 @@ def run(*, print_output: bool, as_json: bool, count: int, failure: bool) -> int:
 
 def _pick_entries(candidates: list[atuin.HistoryEntry]) -> list[atuin.HistoryEntry] | None:
     # Keep Textual off the startup path for normal and explicit-selection invocations.
-    from . import picker
+    from . import picker  # noqa: PLC0415
 
     return picker.pick_entries(candidates)
 
