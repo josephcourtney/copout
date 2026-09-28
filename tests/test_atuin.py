@@ -92,6 +92,7 @@ def test_add_outputs_uses_protocol3_history_service(monkeypatch: pytest.MonkeyPa
                 truncated=True,
                 observed_bytes=24,
                 total_bytes=9,
+                exit_capture_complete=False,
             )
 
     class FakeAtuin:
@@ -122,6 +123,7 @@ def test_add_outputs_uses_protocol3_history_service(monkeypatch: pytest.MonkeyPa
             output_truncated=True,
             output_observed_bytes=24,
             output_total_bytes=9,
+            output_exit_capture_complete=False,
         )
     ]
 
