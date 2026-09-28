@@ -313,7 +313,7 @@ def test_truncated_output_metadata(command_env: CommandEnvironment, as_json: boo
         output = json.loads(result.stdout)["output"]
         assert output["truncated"] is True
         assert output["observed_bytes"] == 10000
-        assert output["total_bytes"] == len("héllo\n".encode())
+        assert output["total_bytes"] is None
         assert output["captured_bytes"] == len("héllo".encode())
     else:
         output_element = ElementTree.fromstring(result.stdout).find("run/output")
@@ -322,7 +322,6 @@ def test_truncated_output_metadata(command_env: CommandEnvironment, as_json: boo
             "truncated": "true",
             "captured_bytes": str(len("héllo".encode())),
             "observed_bytes": "10000",
-            "total_bytes": str(len("héllo\n".encode())),
         }
 
 
