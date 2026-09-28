@@ -80,7 +80,7 @@ The live output test requires the returned text to be exactly `copout-live-probe
 
 ## Output format (schema version 6)
 
-Copout's internal record retains Atuin capture metadata. JSON exposes that structured record after normalizing `output.text` by removing terminal-end ASCII whitespace. `captured_bytes` is recomputed from the presented text; `observed_bytes` and `total_bytes` remain values supplied by the capture backend. Multi-run records may additionally report Copout presentation truncation as described above.
+Copout's internal record retains capture metadata. JSON exposes that structured record after normalizing `output.text` by removing terminal-end ASCII whitespace. `captured_bytes` is recomputed from the presented text. `observed_bytes` is the upstream count of bytes observed before rendering when the backend supplies it. `total_bytes` is reserved for a true complete-output byte count and is left unknown when the backend cannot supply that fact. Atuin's current command-output RPC reports the size of its stored rendered output rather than the complete pre-truncation output size, so Copout does not map that value to schema-v6 `total_bytes`. Multi-run records may additionally report Copout presentation truncation as described above.
 
 XML is deliberately smaller. A typical command looks like:
 
@@ -117,8 +117,8 @@ Extended attributes appear only when they explain an exceptional or incomplete c
 - `encoding`: emitted only when the element payload is a JSON string rather than literal XML character content.
 - `truncated`: emitted as `true` when the upstream capture mechanism reports truncation.
 - `captured_bytes`: byte length of the presented `<output>` text after decoding its transport encoding. It is emitted with extended incompleteness/truncation metadata, not on ordinary captures.
-- `observed_bytes`: upstream count of bytes observed by the capture mechanism, when supplied and extended metadata is needed.
-- `total_bytes`: independently known complete output size supplied by the capture mechanism, when available; Copout does not infer or duplicate it.
+- `observed_bytes`: upstream count of bytes observed by the capture mechanism before rendering, when supplied and extended metadata is needed.
+- `total_bytes`: true complete-output byte size, only when a backend can supply that fact independently. Copout does not infer it, and the current Atuin RPC's stored-rendered-output byte count is not used for this field.
 - `exit_capture_complete`: whether the capture mechanism reports that capture remained active through process termination. Copout emits it only when the upstream API provides it and extended metadata is otherwise relevant; absence does not imply `true`.
 
 Copout also retains `presentation_truncated` and `presentation_omitted_bytes` when Copout itself shortens a multi-run output to fit its presentation budget. That condition is independent of upstream `truncated`.
