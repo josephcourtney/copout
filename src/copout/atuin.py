@@ -44,6 +44,7 @@ class HistoryEntry:
     output_truncated: bool | None = None
     output_observed_bytes: int | None = None
     output_total_bytes: int | None = None
+    output_exit_capture_complete: bool | None = None
     output_error: str | None = None
 
 
@@ -152,12 +153,17 @@ async def _add_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
                 return replace(entry, output_error=f"{type(exc).__name__}: {exc}")
             if output is None:
                 return entry
+
+            exit_capture_complete = getattr(output, "exit_capture_complete", None)
             return replace(
                 entry,
                 output=output.text,
                 output_truncated=output.truncated,
                 output_observed_bytes=output.observed_bytes,
                 output_total_bytes=output.total_bytes,
+                output_exit_capture_complete=(
+                    exit_capture_complete if isinstance(exit_capture_complete, bool) else None
+                ),
             )
 
         return list(await asyncio.gather(*(populate(entry) for entry in entries)))
