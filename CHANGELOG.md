@@ -20,6 +20,12 @@
 
 ## Unreleased
 
+### Added
+
+- Add `copout pick` for arbitrary recent-command selection. Selectors are 1-based newest-first offsets and support inclusive ranges such as `2-4`; selected runs are emitted chronologically.
+- Add a compact interactive picker when `copout pick` is invoked without selectors, with a configurable `--limit` candidate window.
+- Fetch daemon output only for commands selected by `copout pick`, rather than hydrating the entire candidate window.
+
 ### Output and daemon reliability
 
 - Upgrade to Jerakeen 0.10.0 and Atuin daemon protocol 3; captured output is now retrieved through `History.GetCommandOutput` rather than the removed Semantic service.
@@ -28,11 +34,12 @@
 - Start clipboard helpers before Jerakeen/gRPC access so normal clipboard delivery does not fork a new process after gRPC initialization; abort prestarted helpers without publishing an empty clipboard on retrieval failure.
 - Add a live regression test that exercises the real clipboard path and requires clean stderr after gRPC output retrieval.
 - Clarify that live-test probe commands must complete separately in the same shell session.
-- Advance output schema to version 5. Output removes terminal-end whitespace, uses compact XML, formats durations with explicit units, and recomputes normalized JSON byte counts.
+- Advance output schema to version 5. Output removes terminal-end whitespace, uses compact XML, formats durations with explicit units, recomputes normalized JSON byte counts, and reports Copout presentation truncation separately from Atuin capture truncation.
+- Bound presented output for multi-run history records to 128 KiB per run and 512 KiB overall, preserving useful head and tail context with an explicit omission marker. Bare single-command output remains unbounded by Copout.
 - Preserve XML-invalid text reversibly with explicit JSON-string markers and retain daemon truncation and byte-count metadata in the internal/JSON record.
 - Bound daemon output and status requests to three seconds; retain history when output requests time out.
 - Reconcile contributor instructions with the documented history CLI and public Jerakeen API boundary.
-- Add XML round-trip, normalized-output, truncation, and stalled-service regression tests.
+- Add XML round-trip, normalized-output, truncation, stalled-service, multi-command selection, and output-budget regression tests.
 
 ### Fixed
 

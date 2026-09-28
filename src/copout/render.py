@@ -6,6 +6,9 @@ import json
 
 from .record import CopoutRecord, RunRecord
 
+MAX_OUTPUT_BYTES_PER_RUN = 128 * 1024
+MAX_OUTPUT_BYTES_TOTAL = 512 * 1024
+
 
 def _encoded_text(text: str, *, attribute: bool = False) -> tuple[str, bool]:
     # XML 1.0 excludes most controls, surrogates, U+FFFE and U+FFFF.
@@ -53,13 +56,78 @@ def _record_runs(record: CopoutRecord) -> list[RunRecord]:
     return [record]
 
 
+def _fair_output_budgets(sizes: list[int]) -> list[int]:
+    caps = [min(size, MAX_OUTPUT_BYTES_PER_RUN) for size in sizes]
+    if sum(caps) <= MAX_OUTPUT_BYTES_TOTAL:
+        return caps
+
+    low = 0
+    high = MAX_OUTPUT_BYTES_PER_RUN
+    while low < high:
+        midpoint = (low + high + 1) // 2
+        if sum(min(cap, midpoint) for cap in caps) <= MAX_OUTPUT_BYTES_TOTAL:
+            low = midpoint
+        else:
+            high = midpoint - 1
+    return [min(cap, low) for cap in caps]
+
+
+def _utf8_prefix(data: bytes, budget: int) -> str:
+    return data[:budget].decode("utf-8", errors="ignore")
+
+
+def _utf8_suffix(data: bytes, budget: int) -> str:
+    if budget == 0:
+        return ""
+    return data[-budget:].decode("utf-8", errors="ignore")
+
+
+def _bound_text(text: str, *, budget: int) -> tuple[str, int]:
+    data = text.encode()
+    if len(data) <= budget:
+        return text, 0
+    if budget <= 0:
+        return "", len(data)
+
+    placeholder = f"\n... [copout omitted {len(data)} UTF-8 bytes] ...\n"
+    marker_bytes = len(placeholder.encode())
+    if marker_bytes >= budget:
+        return _utf8_prefix(placeholder.encode(), budget), len(data)
+
+    content_budget = budget - marker_bytes
+    head_budget = (content_budget + 1) // 2
+    tail_budget = content_budget // 2
+    head = _utf8_prefix(data, head_budget)
+    tail = _utf8_suffix(data, tail_budget)
+    kept_bytes = len(head.encode()) + len(tail.encode())
+    omitted = len(data) - kept_bytes
+    marker = f"\n... [copout omitted {omitted} UTF-8 bytes] ...\n"
+    bounded = head + marker + tail
+
+    # The placeholder uses the largest possible byte count, so the actual marker
+    # cannot make the result exceed the requested budget.
+    return bounded, omitted
+
+
 def _semantic_record(record: CopoutRecord) -> CopoutRecord:
     projected = copy.deepcopy(record)
-    for run in _record_runs(projected):
+    runs = _record_runs(projected)
+    for run in runs:
         output = run["output"]
         text = _semantic_text(output["text"])
         output["text"] = text
         output["utf8_bytes"] = len(text.encode())
+
+    if projected["scope"] == "history":
+        budgets = _fair_output_budgets([run["output"]["utf8_bytes"] for run in runs])
+        for run, budget in zip(runs, budgets, strict=True):
+            output = run["output"]
+            text, omitted = _bound_text(output["text"], budget=budget)
+            output["text"] = text
+            output["utf8_bytes"] = len(text.encode())
+            if omitted:
+                output["presentation_truncated"] = True
+                output["presentation_omitted_bytes"] = omitted
     return projected
 
 
@@ -93,27 +161,33 @@ def _render_run(
         output_attrs.append(_attribute("state", "unavailable"))
     if output["truncated"]:
         output_attrs.append(_attribute("truncated", "true"))
+    if output.get("presentation_truncated"):
+        output_attrs.append(_attribute("presentation_truncated", "true"))
+        output_attrs.append(
+            _attribute("presentation_omitted_bytes", output.get("presentation_omitted_bytes", 0))
+        )
     if output["error"] is not None:
         output_attrs.append(_attribute("error", output["error"]))
 
     attr_text = f" {' '.join(output_attrs)}" if output_attrs else ""
-    lines.append(f"{indent}  {_element('output', _semantic_text(output['text']), attr_text)}")
+    lines.append(f"{indent}  {_element('output', output['text'], attr_text)}")
     lines.append(f"{indent}</run>")
     return lines
 
 
 def render(record: CopoutRecord, *, as_json: bool = False) -> str:
+    projected = _semantic_record(record)
     if as_json:
-        return json.dumps(_semantic_record(record), indent=2, ensure_ascii=False) + "\n"
+        return json.dumps(projected, indent=2, ensure_ascii=False) + "\n"
 
-    attrs = [_attribute("version", record["version"])]
+    attrs = [_attribute("version", projected["version"])]
     runs: list[RunRecord]
-    include_history_id = record["scope"] == "history"
-    if record["scope"] == "history":
-        attrs.append(_attribute("selected", record["history"]["selected"]))
-        runs = record["runs"]
+    include_history_id = projected["scope"] == "history"
+    if projected["scope"] == "history":
+        attrs.append(_attribute("selected", projected["history"]["selected"]))
+        runs = projected["runs"]
     else:
-        runs = [record]
+        runs = [projected]
 
     lines = [f"<copout {' '.join(attrs)}>"]
     for run in runs:

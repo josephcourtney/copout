@@ -163,30 +163,37 @@ async def _add_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
         return list(await asyncio.gather(*(populate(entry) for entry in entries)))
 
 
-def recent_entries(
-    count: int,
-    *,
-    failed_only: bool = False,
-    include_output: bool = True,
-) -> list[HistoryEntry]:
+def recent_history(count: int, *, failed_only: bool = False) -> list[HistoryEntry]:
+    """Return recent matching history newest-first without contacting the daemon."""
+
     def selected(entry: HistoryEntry) -> bool:
         if _is_copout_command(entry.command):
             return False
         return not failed_only or (entry.exit_status is not None and entry.exit_status != 0)
 
     requested = max(count, 1)
-    entries = [entry for entry in _load_history() if selected(entry)][:requested]
+    return [entry for entry in _load_history() if selected(entry)][:requested]
 
-    # `_load_history` requests Atuin's native newest-first ordering. Preserve it
-    # so sub-second ordering does not depend on the rendered timestamp format.
-    if not include_output or not entries:
-        return entries
 
+def hydrate_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
+    """Fetch captured output only for the supplied history entries."""
+    if not entries:
+        return []
     try:
         return asyncio.run(_add_outputs(entries))
     except Exception as exc:
         # Persistent history remains useful when the daemon is unavailable.
         return [replace(entry, output_error=f"{type(exc).__name__}: {exc}") for entry in entries]
+
+
+def recent_entries(
+    count: int,
+    *,
+    failed_only: bool = False,
+    include_output: bool = True,
+) -> list[HistoryEntry]:
+    entries = recent_history(count, failed_only=failed_only)
+    return hydrate_outputs(entries) if include_output else entries
 
 
 async def _daemon_info() -> DaemonInfo:
