@@ -29,7 +29,7 @@ def test_build_record(monkeypatch) -> None:
     assert result["command"] == "pytest"
     assert result["result"]["status"] == 1
     assert result["output"]["text"] == "FAILED\n"
-    assert result["output"]["captured_bytes"] == len("FAILED\n".encode())
+    assert result["output"]["captured_bytes"] == len(b"FAILED\n")
     assert "capture" not in result
 
 
@@ -102,9 +102,7 @@ def test_render_xml_is_compact_semantic_context(monkeypatch) -> None:
 
 
 def test_history_xml_omits_redundant_selected_attribute() -> None:
-    history = record.build_history_from_entries(
-        [HistoryEntry("id", "echo hi", output="hi\n")]
-    )
+    history = record.build_history_from_entries([HistoryEntry("id", "echo hi", output="hi\n")])
     root = ElementTree.fromstring(render.render(history))
     assert root.attrib == {"version": "6"}
     assert len(root.findall("run")) == 1
