@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import shlex
 import shutil
 from dataclasses import dataclass, replace
 
@@ -130,8 +131,23 @@ def _load_history() -> list[HistoryEntry]:
 
 
 def _is_copout_command(command: str) -> bool:
-    words = command.split(maxsplit=1)
+    try:
+        words = shlex.split(command)
+    except ValueError:
+        words = command.split()
+    if not words:
+        return False
+    if words[0].rsplit("/", 1)[-1] == "uv" and words[1:2] == ["run"]:
+        words = words[2:]
+        if words[:1] == ["--"]:
+            words = words[1:]
     return bool(words) and words[0].rsplit("/", 1)[-1] == "copout"
+
+
+def _output_error(exc: Exception) -> str:
+    # Keep upstream diagnostics useful without copying unbounded text into the record.
+    detail = " ".join(str(exc).split())
+    return f"{type(exc).__name__}: {detail[:500]}"
 
 
 async def _add_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
@@ -142,7 +158,7 @@ async def _add_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
                 async with asyncio.timeout(_DAEMON_TIMEOUT):
                     output = await atuin.history.output(entry.id)
             except AtuinUnsupportedError as exc:
-                detail = str(exc)
+                detail = " ".join(str(exc).split())[:500]
                 error = "Atuin daemon does not implement command-output retrieval"
                 if detail:
                     error = f"{error} ({detail})"
@@ -150,7 +166,7 @@ async def _add_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
             except TimeoutError:
                 return replace(entry, output_error="Atuin daemon output request timed out")
             except Exception as exc:  # preserve history, but report why output is unavailable
-                return replace(entry, output_error=f"{type(exc).__name__}: {exc}")
+                return replace(entry, output_error=_output_error(exc))
             if output is None:
                 return entry
             return replace(
@@ -183,7 +199,7 @@ def hydrate_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
         return asyncio.run(_add_outputs(entries))
     except Exception as exc:
         # Persistent history remains useful when the daemon is unavailable.
-        return [replace(entry, output_error=f"{type(exc).__name__}: {exc}") for entry in entries]
+        return [replace(entry, output_error=_output_error(exc)) for entry in entries]
 
 
 def recent_entries(

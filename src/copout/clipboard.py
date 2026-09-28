@@ -24,7 +24,7 @@ class ClipboardWriter:
 
         try:
             self._process.communicate(text)
-        except OSError as exc:
+        except (OSError, UnicodeError) as exc:
             self.abort()
             print(f"copout: clipboard helper I/O failed: {exc}", file=sys.stderr)
             return 127

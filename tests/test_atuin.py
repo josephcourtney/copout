@@ -163,6 +163,35 @@ def test_recent_entries_failed_only_filters_before_limit(monkeypatch: pytest.Mon
     assert [entry.id for entry in result] == ["3"]
 
 
+@pytest.mark.parametrize(
+    "command, expected",
+    [
+        ("copout -p", True),
+        ("/usr/local/bin/copout pick 1", True),
+        ("uv run copout --print", True),
+        ("uv run -- copout pick", True),
+        ("uv run other copout", False),
+        ("echo copout", False),
+    ],
+)
+def test_copout_command_filter(command: str, expected: bool) -> None:
+    assert atuin._is_copout_command(command) is expected
+
+
+def test_daemon_error_is_bounded_and_single_line(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fail_outputs(selected: list[HistoryEntry]) -> list[HistoryEntry]:
+        del selected
+        raise RuntimeError("private\n" + "x" * 10000)
+
+    monkeypatch.setattr(atuin, "_add_outputs", fail_outputs)
+    result = atuin.hydrate_outputs([HistoryEntry("1", "echo hi")])
+    error = result[0].output_error
+    assert error is not None
+    assert error.startswith("RuntimeError: private ")
+    assert "\n" not in error
+    assert len(error) <= 514
+
+
 def test_recent_entries_degrades_to_history_when_output_is_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

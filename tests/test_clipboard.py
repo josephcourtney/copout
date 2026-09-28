@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -41,3 +42,16 @@ def test_abort_does_not_publish_empty_payload(monkeypatch, tmp_path: Path) -> No
     writer.abort()
 
     assert not marker.exists()
+
+
+def test_writer_reports_encoding_failure(capsys) -> None:
+    process = subprocess.Popen(
+        [sys.executable, "-c", "import sys; sys.stdin.read()"],
+        stdin=subprocess.PIPE,
+        text=True,
+        encoding="ascii",
+    )
+    writer = clipboard.ClipboardWriter(process)
+
+    assert writer.write("🍄") == 127
+    assert "clipboard helper I/O failed" in capsys.readouterr().err

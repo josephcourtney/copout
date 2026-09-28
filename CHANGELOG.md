@@ -48,6 +48,8 @@
 
 ### Fixed
 
+- Handle clipboard text encoding failures with a diagnostic and exit status.
+- Bound daemon error details in output records and recognize `uv run copout` in history filtering.
 - Restore the documented copy/print CLI and synchronous console entry point, removing the experimental future-history tail path.
 - Align the package version with project metadata and repair stale test assumptions.
 - Exercise the installed command with controlled service and clipboard processes, and provide opt-in real shell capture checks.
