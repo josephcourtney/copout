@@ -255,7 +255,7 @@ def render(
 
     attrs = [_attribute("version", projected["version"])]
     include_history_id = projected["scope"] == "history"
-    runs: list[RunRecord] = projected["runs"] if include_history_id else [projected]
+    runs = _record_runs(projected)
 
     lines = [
         _opening_tag(
