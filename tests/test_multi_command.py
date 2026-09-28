@@ -47,11 +47,11 @@ def test_pick_explicit_selectors_are_noninteractive(monkeypatch) -> None:
     monkeypatch.setattr(cli.atuin, "recent_history", lambda limit: entries)
     monkeypatch.setattr(cli.atuin, "hydrate_outputs", lambda selected: selected)
 
-    def must_not_prompt(candidates: list[HistoryEntry]) -> list[str]:
+    def must_not_pick(candidates: list[HistoryEntry]) -> list[HistoryEntry] | None:
         del candidates
-        raise AssertionError("must not prompt")
+        raise AssertionError("must not open interactive picker")
 
-    monkeypatch.setattr(cli.selection, "prompt_selection", must_not_prompt)
+    monkeypatch.setattr(cli, "_pick_entries", must_not_pick)
 
     result = runner.invoke(cli.app, ["pick", "1", "3", "--print"])
 
@@ -61,17 +61,39 @@ def test_pick_explicit_selectors_are_noninteractive(monkeypatch) -> None:
     assert "middle" not in result.stdout
 
 
-def test_pick_without_selectors_uses_prompt(monkeypatch) -> None:
+def test_pick_without_selectors_uses_inline_picker(monkeypatch) -> None:
     entries = [HistoryEntry("2", "newest"), HistoryEntry("1", "oldest")]
     monkeypatch.setattr(cli.atuin, "recent_history", lambda limit: entries)
     monkeypatch.setattr(cli.atuin, "hydrate_outputs", lambda selected: selected)
-    monkeypatch.setattr(cli.selection, "prompt_selection", lambda candidates: ["2"])
+    monkeypatch.setattr(cli, "_pick_entries", lambda candidates: [candidates[1]])
 
     result = runner.invoke(cli.app, ["pick", "--print"])
 
     assert result.exit_code == 0, result.stderr
     assert "oldest" in result.stdout
     assert "newest" not in result.stdout
+
+
+def test_pick_cancel_does_not_hydrate_or_touch_clipboard(monkeypatch) -> None:
+    entries = [HistoryEntry("1", "newest")]
+    monkeypatch.setattr(cli.atuin, "recent_history", lambda limit: entries)
+    monkeypatch.setattr(cli, "_pick_entries", lambda candidates: None)
+
+    def must_not_hydrate(selected: list[HistoryEntry]) -> list[HistoryEntry]:
+        del selected
+        raise AssertionError("cancel must not hydrate output")
+
+    def must_not_start_writer(*, print_output: bool):
+        del print_output
+        raise AssertionError("cancel must not start clipboard helper")
+
+    monkeypatch.setattr(cli.atuin, "hydrate_outputs", must_not_hydrate)
+    monkeypatch.setattr(cli, "_start_writer", must_not_start_writer)
+
+    result = runner.invoke(cli.app, ["pick"])
+
+    assert result.exit_code == 0, result.stderr
+    assert result.stdout == result.stderr == ""
 
 
 def test_pick_rejects_out_of_window_selector(monkeypatch) -> None:

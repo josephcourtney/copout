@@ -23,7 +23,9 @@
 ### Added
 
 - Add `copout pick` for arbitrary recent-command selection. Selectors are 1-based newest-first offsets and support inclusive ranges such as `2-4`; selected runs are emitted chronologically.
-- Add a compact interactive picker when `copout pick` is invoked without selectors, with a configurable `--limit` candidate window.
+- Replace the line-oriented interactive picker with a bounded Textual inline checklist: navigate a scrollable history, toggle commands with Space, confirm the accumulated selection with Enter, and cancel with Esc or `q` without touching the clipboard.
+- Increase the default interactive candidate window from 20 to 100 commands now that candidates scroll within a fixed-height picker.
+- Keep Textual off the normal startup path; it is imported only for interactive `copout pick`.
 - Fetch daemon output only for commands selected by `copout pick`, rather than hydrating the entire candidate window.
 
 ### Output and daemon reliability
@@ -39,7 +41,7 @@
 - Preserve XML-invalid text reversibly with explicit JSON-string markers and retain daemon truncation and byte-count metadata in the internal/JSON record.
 - Bound daemon output and status requests to three seconds; retain history when output requests time out.
 - Reconcile contributor instructions with the documented history CLI and public Jerakeen API boundary.
-- Add XML round-trip, normalized-output, truncation, stalled-service, multi-command selection, and output-budget regression tests.
+- Add XML round-trip, normalized-output, truncation, stalled-service, multi-command selection, output-budget, and inline-picker regression tests.
 
 ### Fixed
 

@@ -36,22 +36,22 @@ copout verify
 ## Use
 
 ```console
-copout                 # compact XML for the previous command
-copout -p              # print instead of clipboard
-copout --json          # JSON instead of XML
-copout -n 5            # last five commands in the current Atuin session
-copout --failure       # most recent failed command
-copout pick             # interactively choose recent commands
+copout                  # compact XML for the previous command
+copout -p               # print instead of clipboard
+copout --json           # JSON instead of XML
+copout -n 5             # last five commands in the current Atuin session
+copout --failure        # most recent failed command
+copout pick             # inline checklist for recent commands
 copout pick 1 3 6       # choose non-contiguous recent commands
 copout pick 2-4 8       # ranges are inclusive
-copout pick --limit 50  # enlarge the interactive candidate window
-copout doctor           # detailed integration diagnostics
-copout verify           # concise history + output assertion
+copout pick --limit 250 # browse farther back in the interactive picker
+copout doctor            # detailed integration diagnostics
+copout verify            # concise history + output assertion
 ```
 
-`copout pick` numbers candidate commands newest-first after excluding Copout commands: `1` is the same command selected by bare `copout`, `2` is the command before that, and so on. Selected runs are emitted chronologically. Explicit selectors are noninteractive; with no selectors, Copout prints a compact numbered history list to the controlling terminal and accepts numbers or ranges such as `1 3 5-7`. The default candidate window is 20 commands.
+`copout pick` numbers candidate commands newest-first after excluding Copout commands: `1` is the same command selected by bare `copout`, `2` is the command before that, and so on. Selected runs are emitted chronologically. Explicit selectors are noninteractive. With no selectors, Copout opens a bounded inline checklist over the 100 most recent commands by default. Use Up/Down, Page Up/Page Down, Home/End to move, Space to toggle commands, Enter to copy the accumulated selection, and Esc or `q` to cancel without touching the clipboard. The list scrolls within the inline region rather than printing the entire candidate window into shell history.
 
-Picker discovery reads only Atuin history metadata. Copout asks the daemon for output only after the selection is known, and then only for the selected commands. `copout pick -p` therefore keeps picker UI off stdout, while `copout pick 1 4 6 -p > context.xml` is fully noninteractive.
+Picker discovery reads only Atuin history metadata. Copout asks the daemon for output only after the selection is known, and then only for the selected commands. The Textual UI is imported only for interactive `copout pick`, so the normal `copout`, `-n`, and explicit `copout pick 1 4 6` paths do not pay its startup cost. Picker drawing is routed to the controlling terminal rather than structured stdout, so `copout pick -p > context.xml` remains usable; `copout pick 1 4 6 -p > context.xml` is fully noninteractive.
 
 Copout retrieves persisted chronological history with `atuin history list --session` and retrieves recent captured output from the Atuin daemon through Jerakeen. It does not access Atuin's private database or implement the daemon gRPC protocol itself.
 
@@ -61,7 +61,7 @@ For multi-run history records, presented output is bounded to 128 KiB per run an
 
 ## Testing
 
-Run `just check` for lint, formatting, typing, and the test suite. Command tests execute the installed `copout` launcher and module entry point in subprocesses, with a controlled Atuin executable, Jerakeen client, and clipboard helper. They cover selection, normalized output, unavailable output, service errors, diagnostics, and clipboard delivery without modifying your clipboard or history.
+Run `just check` for lint, formatting, typing, and the test suite. Command tests execute the installed `copout` launcher and module entry point in subprocesses, with a controlled Atuin executable, Jerakeen client, and clipboard helper. They cover selection, normalized output, unavailable output, service errors, diagnostics, and clipboard delivery without modifying your clipboard or history. The inline picker also has headless Textual interaction tests for navigation, multi-selection, confirmation, and cancellation.
 
 The real shell capture tests are opt-in. In an Atuin-integrated terminal with output capture enabled, run these as two separate commands:
 

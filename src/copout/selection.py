@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import sys
-from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
-from typing import TYPE_CHECKING, TextIO
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .atuin import HistoryEntry
 
-DEFAULT_PICK_LIMIT = 20
+DEFAULT_PICK_LIMIT = 100
 
 
 class SelectionError(ValueError):
@@ -87,37 +85,3 @@ def candidate_lines(entries: Sequence[HistoryEntry]) -> list[str]:
             f"{_duration_text(entry.duration):>7}  {command}"
         )
     return lines
-
-
-@contextmanager
-def _terminal_streams() -> Iterator[tuple[TextIO, TextIO]]:
-    if sys.stdin.isatty():
-        yield sys.stdin, sys.stderr
-        return
-
-    try:
-        with open("/dev/tty", "r+", encoding="utf-8") as tty:
-            yield tty, tty
-    except OSError as exc:
-        raise SelectionError(
-            "interactive selection requires a controlling terminal; pass selectors explicitly"
-        ) from exc
-
-
-def prompt_selection(entries: Sequence[HistoryEntry]) -> list[str]:
-    if not entries:
-        raise SelectionError("no recent commands are available")
-
-    with _terminal_streams() as (input_stream, output_stream):
-        for line in candidate_lines(entries):
-            print(line, file=output_stream)
-        output_stream.write("select> ")
-        output_stream.flush()
-        response = input_stream.readline()
-
-    if response == "":
-        raise SelectionError("interactive selection ended before a selection was entered")
-    tokens = response.split()
-    if not tokens:
-        raise SelectionError("no commands selected")
-    return tokens

@@ -66,6 +66,13 @@ def run(*, print_output: bool, as_json: bool, count: int, failure: bool) -> int:
             writer.abort()
 
 
+def _pick_entries(candidates: list[atuin.HistoryEntry]) -> list[atuin.HistoryEntry] | None:
+    # Keep Textual off the startup path for normal and explicit-selection invocations.
+    from . import picker
+
+    return picker.pick_entries(candidates)
+
+
 def run_pick(
     *,
     selectors: list[str],
@@ -79,8 +86,12 @@ def run_pick(
         return _report_atuin_error(exc)
 
     try:
-        requested = selectors or selection.prompt_selection(candidates)
-        selected = selection.select_entries(candidates, requested)
+        if selectors:
+            selected = selection.select_entries(candidates, selectors)
+        else:
+            selected = _pick_entries(candidates)
+            if selected is None:
+                return 0
     except selection.SelectionError as exc:
         print(f"copout: {exc}", file=sys.stderr)
         return 2
