@@ -24,11 +24,12 @@ def test_build_record(monkeypatch) -> None:
         ],
     )
     result = record.build_record()
-    assert result["version"] == 5
+    assert result["version"] == 6
     assert result["source"] == "atuin"
     assert result["command"] == "pytest"
     assert result["result"]["status"] == 1
     assert result["output"]["text"] == "FAILED\n"
+    assert result["output"]["captured_bytes"] == len("FAILED\n".encode())
     assert "capture" not in result
 
 
@@ -73,10 +74,11 @@ def test_render_json_uses_semantic_output(monkeypatch) -> None:
     rendered = render.render(record.build_record(), as_json=True)
     payload = json.loads(rendered)
     assert payload["history_id"] == "id1"
-    assert payload["version"] == 5
+    assert payload["version"] == 6
     assert payload["source"] == "atuin"
     assert payload["output"]["text"] == "hi"
-    assert payload["output"]["utf8_bytes"] == 2
+    assert payload["output"]["captured_bytes"] == 2
+    assert "utf8_bytes" not in payload["output"]
 
 
 def test_render_xml_is_compact_semantic_context(monkeypatch) -> None:
@@ -88,15 +90,37 @@ def test_render_xml_is_compact_semantic_context(monkeypatch) -> None:
         ],
     )
     root = ElementTree.fromstring(render.render(record.build_record()))
-    assert root.attrib == {"version": "5"}
+    assert root.attrib == {"version": "6"}
     run = root.find("run")
     assert run is not None
-    assert run.attrib == {"status": "0", "cwd": "/tmp", "duration": "102ms"}
+    assert run.attrib == {"status": "0", "cwd": "/tmp", "duration_ms": "102"}
     assert run.findtext("command") == "echo <x>"
     output = run.find("output")
     assert output is not None
     assert output.attrib == {}
     assert output.text == "<x>"
+
+
+def test_history_xml_omits_redundant_selected_attribute() -> None:
+    history = record.build_history_from_entries(
+        [HistoryEntry("id", "echo hi", output="hi\n")]
+    )
+    root = ElementTree.fromstring(render.render(history))
+    assert root.attrib == {"version": "6"}
+    assert len(root.findall("run")) == 1
+
+
+def test_xml_attribute_pretty_printing_is_opt_in(monkeypatch) -> None:
+    monkeypatch.setattr(
+        record,
+        "recent_entries",
+        lambda count: [HistoryEntry("id", "echo hi", "/tmp", 0, 0.121, "", "hi\n")],
+    )
+    compact = render.render(record.build_record())
+    pretty = render.render(record.build_record(), pretty_attributes=True)
+
+    assert '<run status="0" cwd="/tmp" duration_ms="121">' in compact
+    assert '<run\n    status="0"\n    cwd="/tmp"\n    duration_ms="121">' in pretty
 
 
 def test_xml_round_trips_controls_and_attribute_whitespace(monkeypatch) -> None:
@@ -131,9 +155,52 @@ def test_xml_plain_text_and_cdata_terminator_round_trip(monkeypatch) -> None:
         assert element.text == text
 
 
+def test_normal_capture_metadata_stays_sparse(monkeypatch) -> None:
+    entry = HistoryEntry(
+        "id",
+        "echo hi",
+        output="hi\n",
+        output_truncated=False,
+        output_observed_bytes=3,
+        output_total_bytes=3,
+        output_exit_capture_complete=True,
+    )
+    monkeypatch.setattr(record, "recent_entries", lambda count: [entry])
+
+    output = ElementTree.fromstring(render.render(record.build_record())).find("run/output")
+
+    assert output is not None
+    assert output.attrib == {}
+
+
+def test_extended_capture_metadata_is_emitted_for_incomplete_output(monkeypatch) -> None:
+    entry = HistoryEntry(
+        "id",
+        "build",
+        output="hello\n",
+        output_truncated=True,
+        output_observed_bytes=24,
+        output_total_bytes=30,
+        output_exit_capture_complete=False,
+    )
+    monkeypatch.setattr(record, "recent_entries", lambda count: [entry])
+
+    output = ElementTree.fromstring(render.render(record.build_record())).find("run/output")
+
+    assert output is not None
+    assert output.attrib == {
+        "truncated": "true",
+        "captured_bytes": "5",
+        "observed_bytes": "24",
+        "total_bytes": "30",
+        "exit_capture_complete": "false",
+    }
+
+
 def test_unavailable_capture_metadata_is_unknown(monkeypatch) -> None:
     monkeypatch.setattr(record, "recent_entries", lambda count: [HistoryEntry("id", "true")])
     output = record.build_record()["output"]
     assert output["truncated"] is None
     assert output["observed_bytes"] is None
     assert output["total_bytes"] is None
+    assert "exit_capture_complete" not in output
