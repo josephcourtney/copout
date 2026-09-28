@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-from typing import TextIO
+from typing import ClassVar, TextIO
 
 from textual import on
 from textual.app import App, ComposeResult
@@ -44,7 +44,7 @@ class CommandPicker(App[list[int] | None]):
         color: $text-muted;
     }
     """
-    BINDINGS = [
+    BINDINGS: ClassVar[list[Binding]] = [
         Binding("enter", "confirm", "Copy", priority=True),
         Binding("escape", "cancel", "Cancel", priority=True),
         Binding("q", "cancel", "Cancel", priority=True),
