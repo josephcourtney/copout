@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import shutil
 import subprocess
 import sys
@@ -43,18 +44,14 @@ class ClipboardWriter:
         self._finished = True
 
         if self._process.poll() is None:
-            try:
+            with contextlib.suppress(OSError):
                 self._process.terminate()
-            except OSError:
-                pass
 
         try:
             self._process.wait(timeout=1)
         except subprocess.TimeoutExpired:
-            try:
+            with contextlib.suppress(OSError):
                 self._process.kill()
-            except OSError:
-                pass
             self._process.wait()
         finally:
             if self._process.stdin is not None:
