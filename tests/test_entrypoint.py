@@ -178,9 +178,9 @@ def test_command_copies_to_helper(command_env: CommandEnvironment) -> None:
     assert result.returncode == 0, result.stderr
     assert result.stdout == result.stderr == ""
     copied = command_env.clipboard.read_text()
-    assert copied.startswith('<copout version="5"')
+    assert copied.startswith('<copout version="6"')
     assert "<![CDATA[héllo]]>" in copied
-    assert "utf8_bytes" not in copied
+    assert "captured_bytes" not in copied
     assert 'source="atuin"' not in copied
 
 
@@ -272,6 +272,7 @@ def test_command_help_needs_no_services(command_env: CommandEnvironment, flag: s
     result = command_env.run(flag)
     assert result.returncode == 0, result.stderr
     assert "--print" in result.stdout
+    assert "--pretty-attributes" in result.stdout
     assert "--rendered" not in result.stdout
     assert "--raw" not in result.stdout
 
@@ -312,12 +313,16 @@ def test_truncated_output_metadata(command_env: CommandEnvironment, as_json: boo
         output = json.loads(result.stdout)["output"]
         assert output["truncated"] is True
         assert output["observed_bytes"] == 10000
-        assert output["total_bytes"] == len("héllo\n".encode())
-        assert output["utf8_bytes"] == len("héllo".encode())
+        assert output["total_bytes"] is None
+        assert output["captured_bytes"] == len("héllo".encode())
     else:
         output_element = ElementTree.fromstring(result.stdout).find("run/output")
         assert output_element is not None
-        assert output_element.attrib == {"truncated": "true"}
+        assert output_element.attrib == {
+            "truncated": "true",
+            "captured_bytes": str(len("héllo".encode())),
+            "observed_bytes": "10000",
+        }
 
 
 def test_xml_keeps_ansi_but_trims_terminal_end_whitespace(

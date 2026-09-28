@@ -32,8 +32,13 @@ def _write_record(
     *,
     writer: clipboard.ClipboardWriter | None,
     as_json: bool,
+    pretty_attributes: bool,
 ) -> int:
-    rendered = render.render(captured, as_json=as_json)
+    rendered = render.render(
+        captured,
+        as_json=as_json,
+        pretty_attributes=pretty_attributes,
+    )
     if writer is None:
         sys.stdout.write(rendered)
         return 0
@@ -46,7 +51,14 @@ def _report_atuin_error(exc: record.AtuinError) -> int:
     return 3
 
 
-def run(*, print_output: bool, as_json: bool, count: int, failure: bool) -> int:
+def run(
+    *,
+    print_output: bool,
+    as_json: bool,
+    pretty_attributes: bool,
+    count: int,
+    failure: bool,
+) -> int:
     writer, error_code = _start_writer(print_output=print_output)
     if error_code is not None:
         return error_code
@@ -60,7 +72,12 @@ def run(*, print_output: bool, as_json: bool, count: int, failure: bool) -> int:
             )
         except record.AtuinError as exc:
             return _report_atuin_error(exc)
-        return _write_record(captured, writer=writer, as_json=as_json)
+        return _write_record(
+            captured,
+            writer=writer,
+            as_json=as_json,
+            pretty_attributes=pretty_attributes,
+        )
     finally:
         if writer is not None:
             writer.abort()
@@ -79,6 +96,7 @@ def run_pick(
     limit: int,
     print_output: bool,
     as_json: bool,
+    pretty_attributes: bool,
 ) -> int:
     try:
         candidates = atuin.recent_history(limit)
@@ -103,7 +121,12 @@ def run_pick(
     try:
         hydrated = atuin.hydrate_outputs(selected)
         captured = record.build_history_from_entries(hydrated)
-        return _write_record(captured, writer=writer, as_json=as_json)
+        return _write_record(
+            captured,
+            writer=writer,
+            as_json=as_json,
+            pretty_attributes=pretty_attributes,
+        )
     finally:
         if writer is not None:
             writer.abort()
@@ -116,6 +139,13 @@ def cli(
         bool, typer.Option("--print", "-p", help="Print instead of copying.")
     ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON instead of XML.")] = False,
+    pretty_attributes: Annotated[
+        bool,
+        typer.Option(
+            "--pretty-attributes",
+            help="Put XML attributes on separate lines when an element has several.",
+        ),
+    ] = False,
     last: Annotated[
         int, typer.Option("--last", "-n", min=1, help="Include the last N commands.")
     ] = 1,
@@ -127,7 +157,15 @@ def cli(
     """Copy recent Atuin command history and captured output."""
     if ctx.invoked_subcommand is not None:
         return
-    raise typer.Exit(run(print_output=print_output, as_json=as_json, count=last, failure=failure))
+    raise typer.Exit(
+        run(
+            print_output=print_output,
+            as_json=as_json,
+            pretty_attributes=pretty_attributes,
+            count=last,
+            failure=failure,
+        )
+    )
 
 
 @app.command("pick")
@@ -144,6 +182,13 @@ def pick_command(
         bool, typer.Option("--print", "-p", help="Print instead of copying.")
     ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON instead of XML.")] = False,
+    pretty_attributes: Annotated[
+        bool,
+        typer.Option(
+            "--pretty-attributes",
+            help="Put XML attributes on separate lines when an element has several.",
+        ),
+    ] = False,
 ) -> None:
     """Choose arbitrary recent commands and copy them as one history record."""
     raise typer.Exit(
@@ -152,6 +197,7 @@ def pick_command(
             limit=limit,
             print_output=print_output,
             as_json=as_json,
+            pretty_attributes=pretty_attributes,
         )
     )
 

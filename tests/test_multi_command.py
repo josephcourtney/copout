@@ -130,7 +130,7 @@ def test_history_output_is_bounded_and_marked() -> None:
 
     assert output["presentation_truncated"] is True
     assert output["presentation_omitted_bytes"] > 0
-    assert output["utf8_bytes"] <= render.MAX_OUTPUT_BYTES_PER_RUN
+    assert output["captured_bytes"] <= render.MAX_OUTPUT_BYTES_PER_RUN
     assert "copout omitted" in output["text"]
 
 
@@ -139,7 +139,7 @@ def test_history_total_output_budget_is_shared() -> None:
         HistoryEntry(str(index), f"cmd {index}", output="x" * (200 * 1024)) for index in range(6)
     ]
     payload = json.loads(render.render(record.build_history_from_entries(entries), as_json=True))
-    sizes = [run["output"]["utf8_bytes"] for run in payload["runs"]]
+    sizes = [run["output"]["captured_bytes"] for run in payload["runs"]]
 
     assert sum(sizes) <= render.MAX_OUTPUT_BYTES_TOTAL
     assert max(sizes) <= render.MAX_OUTPUT_BYTES_PER_RUN
@@ -165,7 +165,7 @@ def test_history_utf8_truncation_does_not_split_codepoints() -> None:
     output = payload["runs"][0]["output"]
 
     assert output["text"].encode("utf-8").decode("utf-8") == output["text"]
-    assert output["utf8_bytes"] <= render.MAX_OUTPUT_BYTES_PER_RUN
+    assert output["captured_bytes"] <= render.MAX_OUTPUT_BYTES_PER_RUN
 
 
 def test_xml_reports_presentation_truncation_separately() -> None:
@@ -177,4 +177,5 @@ def test_xml_reports_presentation_truncation_separately() -> None:
     assert output is not None
     assert output.attrib["presentation_truncated"] == "true"
     assert int(output.attrib["presentation_omitted_bytes"]) > 0
+    assert int(output.attrib["captured_bytes"]) <= render.MAX_OUTPUT_BYTES_PER_RUN
     assert "truncated" not in output.attrib
