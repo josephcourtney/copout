@@ -41,13 +41,23 @@ copout -p              # print instead of clipboard
 copout --json          # JSON instead of XML
 copout -n 5            # last five commands in the current Atuin session
 copout --failure       # most recent failed command
-copout doctor          # detailed integration diagnostics
-copout verify          # concise history + output assertion
+copout pick             # interactively choose recent commands
+copout pick 1 3 6       # choose non-contiguous recent commands
+copout pick 2-4 8       # ranges are inclusive
+copout pick --limit 50  # enlarge the interactive candidate window
+copout doctor           # detailed integration diagnostics
+copout verify           # concise history + output assertion
 ```
+
+`copout pick` numbers candidate commands newest-first after excluding Copout commands: `1` is the same command selected by bare `copout`, `2` is the command before that, and so on. Selected runs are emitted chronologically. Explicit selectors are noninteractive; with no selectors, Copout prints a compact numbered history list to the controlling terminal and accepts numbers or ranges such as `1 3 5-7`. The default candidate window is 20 commands.
+
+Picker discovery reads only Atuin history metadata. Copout asks the daemon for output only after the selection is known, and then only for the selected commands. `copout pick -p` therefore keeps picker UI off stdout, while `copout pick 1 4 6 -p > context.xml` is fully noninteractive.
 
 Copout retrieves persisted chronological history with `atuin history list --session` and retrieves recent captured output from the Atuin daemon through Jerakeen. It does not access Atuin's private database or implement the daemon gRPC protocol itself.
 
 Copout is presentation-focused. It removes ASCII whitespace only from the end of the complete captured output, which eliminates terminal-cell padding and final blank rows while preserving internal indentation, spacing, blank lines, and any SGR styling that survives Atuin's capture. XML is compact: routine transport metadata such as a single command's history ID, byte counts, and capture provenance are omitted. Durations use explicit units such as `102ms` or `2.5s`.
+
+For multi-run history records, presented output is bounded to 128 KiB per run and 512 KiB across all runs. Oversized output preserves both its beginning and end with an explicit omission marker. This presentation truncation is separate from Atuin capture truncation: JSON adds `presentation_truncated` and `presentation_omitted_bytes` when Copout shortens an output, while XML adds the same attributes to `<output>`. Bare single-command `copout` output is not subject to this presentation budget.
 
 ## Testing
 
@@ -69,7 +79,7 @@ The live output test requires the returned text to be exactly `copout-live-probe
 
 ## Output format (schema version 5)
 
-Copout's internal record retains Atuin capture metadata. JSON exposes that structured record after normalizing `output.text` by removing terminal-end ASCII whitespace; `utf8_bytes` is recomputed from the normalized text, while `observed_bytes` and `total_bytes` remain Atuin's original capture metadata.
+Copout's internal record retains Atuin capture metadata. JSON exposes that structured record after normalizing `output.text` by removing terminal-end ASCII whitespace; `utf8_bytes` is recomputed from the presented text, while `observed_bytes` and `total_bytes` remain Atuin's original capture metadata. Multi-run records may additionally report Copout presentation truncation as described above.
 
 XML is deliberately smaller. A typical command looks like:
 
@@ -82,7 +92,7 @@ XML is deliberately smaller. A typical command looks like:
 </copout>
 ```
 
-For history captures, run history IDs remain present so commands can be distinguished. Unavailable output is marked `state="unavailable"`; truncated output is marked `truncated="true"`; errors are retained when present.
+For history captures, run history IDs remain present so commands can be distinguished. Unavailable output is marked `state="unavailable"`; Atuin-truncated output is marked `truncated="true"`; errors are retained when present. Copout presentation truncation is marked separately with `presentation_truncated="true"` and `presentation_omitted_bytes="..."`.
 
 XML normally uses readable CDATA. If text contains XML-invalid characters (including ANSI escape codes), or carriage returns that XML parsing would normalize, the element has `encoding="json-string"` and its CDATA contains a JSON string literal. Parse the XML, then JSON-decode that element's text to recover the string. Attribute values that require this treatment have a companion marker such as `cwd_encoding="json-string"`.
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 from .atuin import AtuinError, HistoryEntry, recent_entries
 
@@ -24,6 +24,8 @@ class OutputRecord(TypedDict):
     observed_bytes: int | None
     total_bytes: int | None
     error: str | None
+    presentation_truncated: NotRequired[bool]
+    presentation_omitted_bytes: NotRequired[int]
 
 
 class ContextRecord(TypedDict):
@@ -118,9 +120,13 @@ def build_record() -> CommandRecord:
     }
 
 
-def build_history(*, count: int, failed_only: bool = False) -> HistoryRecord:
-    entries = recent_entries(count, failed_only=failed_only)
-    entries.reverse()
+def build_history_from_entries(
+    entries: list[HistoryEntry],
+    *,
+    requested: int | None = None,
+    failed_only: bool = False,
+) -> HistoryRecord:
+    """Build a chronological multi-run record from already selected entries."""
     runs = [_entry_record(entry) for entry in entries]
     return {
         **_metadata(),
@@ -128,8 +134,14 @@ def build_history(*, count: int, failed_only: bool = False) -> HistoryRecord:
         "runs": runs,
         "history": {
             "selected": len(runs),
-            "requested": count,
+            "requested": len(runs) if requested is None else requested,
             "failed_only": failed_only,
             "outputs_available": sum(run["output"]["state"] == "captured" for run in runs),
         },
     }
+
+
+def build_history(*, count: int, failed_only: bool = False) -> HistoryRecord:
+    entries = recent_entries(count, failed_only=failed_only)
+    entries.reverse()
+    return build_history_from_entries(entries, requested=count, failed_only=failed_only)
