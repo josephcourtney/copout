@@ -79,7 +79,7 @@ def _semantic_text(text: str) -> str:
 
 
 def _duration_ms(seconds: float) -> int:
-    return int(round(seconds * 1000))
+    return round(seconds * 1000)
 
 
 def _record_runs(record: CopoutRecord) -> list[RunRecord]:
@@ -254,12 +254,8 @@ def render(
         return json.dumps(projected, indent=2, ensure_ascii=False) + "\n"
 
     attrs = [_attribute("version", projected["version"])]
-    runs: list[RunRecord]
     include_history_id = projected["scope"] == "history"
-    if projected["scope"] == "history":
-        runs = projected["runs"]
-    else:
-        runs = [projected]
+    runs: list[RunRecord] = projected["runs"] if include_history_id else [projected]
 
     lines = [
         _opening_tag(
