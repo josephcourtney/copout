@@ -73,10 +73,7 @@ class CommandPicker(App[list[int] | None]):
 
     @staticmethod
     def _help_text(selected: int) -> str:
-        return (
-            f"{selected} selected  ↑↓ navigate  Space toggle  "
-            "Enter copy  Esc/q cancel"
-        )
+        return f"{selected} selected  ↑↓ navigate  Space toggle  Enter copy  Esc/q cancel"
 
     def action_confirm(self) -> None:
         choices = self.query_one("#commands", SelectionList)

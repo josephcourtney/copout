@@ -136,8 +136,7 @@ def test_history_output_is_bounded_and_marked() -> None:
 
 def test_history_total_output_budget_is_shared() -> None:
     entries = [
-        HistoryEntry(str(index), f"cmd {index}", output="x" * (200 * 1024))
-        for index in range(6)
+        HistoryEntry(str(index), f"cmd {index}", output="x" * (200 * 1024)) for index in range(6)
     ]
     payload = json.loads(render.render(record.build_history_from_entries(entries), as_json=True))
     sizes = [run["output"]["utf8_bytes"] for run in payload["runs"]]
