@@ -63,9 +63,13 @@ def _run_probe_in_atuin_shell(output_path: Path) -> None:
         os.execv(zsh, [zsh, "-il"])
 
     try:
-        # Input is buffered by the PTY until zsh is ready. Setting a deterministic
-        # prompt after startup lets us detect complete Atuin command lifecycles.
-        _send(fd, "PROMPT='__COPOUT_TEST_PROMPT__ ' RPROMPT='' PROMPT_EOL_MARK='' ")
+        # Input is buffered by the PTY until zsh is ready. Construct the prompt
+        # from separate fragments so terminal echo of this command cannot itself
+        # contain the sentinel that marks a completed command lifecycle.
+        _send(
+            fd,
+            "PROMPT='__COPOUT_TEST_'$'PROMPT__ ' RPROMPT='' PROMPT_EOL_MARK=''",
+        )
         _read_until(fd, _PROMPT)
 
         _send(fd, "printf 'copout-live-probe\\n'")
