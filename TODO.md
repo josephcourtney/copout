@@ -8,10 +8,12 @@
 - [x] Keep `lint`/`format` mutating by default while preserving non-mutating `just check`.
 - [x] Align `POLICY.md`, contributor guidance, README, changelog, and planning documents with the implemented architecture.
 - [x] Bump package metadata to 0.10.0.
-- [ ] Regenerate `uv.lock` after the version bump.
-- [ ] Run `just repair` after the release-document/version changes and confirm the working tree is clean apart from intentional edits.
-- [ ] Run `just check` as the final non-mutating release validation.
+- [x] Regenerate `uv.lock` after the version bump.
+- [x] Run `just repair` after the release-document/version changes and confirm the working tree is clean apart from intentional edits.
+- [x] Run `just check` as the final non-mutating release validation.
 - [ ] Tag/publish 0.10.0 only when explicitly requested.
+
+Release validation on 2026-10-01: `just repair` and `just check` both passed with 127 tests; the only resulting working-tree change was the expected `uv.lock` version update from 0.9.3 to 0.10.0.
 
 ## Follow-up
 
