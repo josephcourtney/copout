@@ -50,7 +50,7 @@ copout pick 2-4 8       # ranges are inclusive
 copout pick --limit 250 # browse farther back in the interactive picker
 copout pick --preselect-records id1,id2 # open with exact Atuin records selected
 copout --no-context     # omit all optional environment/repository context
-copout --git-extended   # add upstream/divergence/remote/changed-file context
+copout --git-extended   # add worktree/upstream/divergence/remote/changed-file context
 copout --git-diff       # add a bounded working-tree diff
 copout --hostname-context # explicitly include the hostname
 copout --env TERM --env LANG # explicitly include selected environment variables
@@ -87,7 +87,7 @@ Disabled by default:
 
 - Hostname.
 - Shell version and OS release/version.
-- Extended Git details: upstream, ahead/behind counts, remote URL, and changed filenames.
+- Extended Git details: Git/common directory, linked-worktree state, upstream, ahead/behind counts, remote URL, and changed filenames.
 - Git working-tree diff. When enabled, it is bounded to 64 KiB and reports whether it was truncated.
 - Arbitrary environment variables.
 - Explicit executable resolution.
@@ -96,7 +96,7 @@ Git context is marked `observed_at_capture="true"`: it describes repository stat
 
 All extra context can be disabled with `--no-context`. Category overrides include `--no-git-context`, `--no-system-context`, `--no-python-context`, `--hostname-context`, `--shell-version`, `--os-version`, `--git-extended`, and `--git-diff`. `--env NAME` and `--resolve NAME` are repeatable and only expose values explicitly requested.
 
-Copout reads persistent context settings from `$COPOUT_CONFIG` when set, otherwise `$XDG_CONFIG_HOME/copout/config.toml`, otherwise `~/.config/copout/config.toml`. `--config PATH` selects another file. Command-line values override the file; repeated `--env` and `--resolve` values extend configured lists.
+Copout reads persistent context settings from `$COPOUT_CONFIG` when set, otherwise `$XDG_CONFIG_HOME/copout/config.toml`, otherwise `~/.config/copout/config.toml`. `--config PATH` selects another file. An explicitly selected config path must exist. Command-line values override the file; repeated `--env` and `--resolve` values extend configured lists.
 
 ```toml
 [context]
@@ -119,7 +119,7 @@ executables = []
 
 Run `just check` for non-mutating lint, formatting, typing, and the test suite. `just repair` syncs dependencies, applies formatting and safe Ruff fixes, then runs type checking and tests without redundantly rerunning the Ruff validation passes. Add `--unsafe-fixes` to `just repair` or `just lint` to enable Ruff's unsafe fixes.
 
-Command tests execute the installed `copout` launcher and module entry point in subprocesses, with a controlled Atuin executable, Jerakeen client, and clipboard helper. They cover selection, normalized output, unavailable output, service errors, diagnostics, clipboard delivery, context configuration, and rendering without modifying your clipboard or history. The inline picker also has headless Textual interaction tests for navigation, multi-selection, confirmation, and cancellation.
+Command tests execute the installed `copout` launcher and module entry point in subprocesses, with a controlled Atuin executable, Jerakeen client, clipboard helper, and isolated config directory. They cover selection, normalized output, unavailable output, service errors, diagnostics, clipboard delivery, context configuration, and rendering without modifying your clipboard or history. The inline picker also has headless Textual interaction tests for navigation, multi-selection, confirmation, and cancellation.
 
 The real shell capture test is self-contained. When `zsh` and `atuin` are available, pytest starts an interactive zsh in a PTY, lets the normal Atuin shell integration initialize, executes a standalone probe, waits across a separate command boundary for Atuin to finalize it, then verifies that Copout can retrieve the captured output. It skips only when the required shell/Atuin executable is unavailable; no manual probe or `COPOUT_LIVE_ATUIN` environment variable is required.
 
@@ -130,11 +130,11 @@ Copout's internal record retains capture metadata. JSON exposes that structured 
 XML is deliberately compact. A typical command executed inside a Git repository can look like:
 
 ```xml
-<copout version="7">
-  <environment login_shell="/bin/zsh" os="darwin" arch="arm64" session_id="...">
+<copout version="7" captured_at="2026-10-01T09:31:00-04:00">
+  <environment login_shell="/bin/zsh" os="macos" arch="arm64" session_id="...">
     <python executable="/repo/.venv/bin/python" version="3.14.0" implementation="cpython" environment="/repo/.venv"/>
   </environment>
-  <run status="0" cwd="/repo" duration_ms="102">
+  <run status="0" cwd="/repo" duration_ms="102" recorded_at="2026-10-01 09:30:59">
     <git observed_at_capture="true" root="/repo" branch="main" detached="false" commit="abc123..." dirty="false"/>
     <command><![CDATA[printf 'hello\n']]></command>
     <output><![CDATA[hello]]></output>
@@ -142,7 +142,7 @@ XML is deliberately compact. A typical command executed inside a Git repository 
 </copout>
 ```
 
-History XML has one `<run>` per selected command and does not repeat that count as a root attribute. Run durations are canonical integer milliseconds in `duration_ms`. Structured optional context uses child elements: extended Git context may add `<changed-file>` and `<diff>`, while explicitly requested environment variables and executable resolutions appear as `<variable>` and `<executable>` children of `<environment>`.
+History XML has one `<run>` per selected command and does not repeat that count as a root attribute. Run durations are canonical integer milliseconds in `duration_ms`. `captured_at` records when Copout built the record, while `recorded_at` is the timestamp supplied by Atuin for the command. Structured optional context uses child elements: extended Git context may add worktree attributes plus `<changed-file>` and `<diff>`, while explicitly requested environment variables and executable resolutions appear as `<variable>` and `<executable>` children of `<environment>`.
 
 ### Text encoding contract
 
