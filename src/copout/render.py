@@ -136,9 +136,7 @@ def _bound_text(text: str, *, budget: int) -> tuple[str, int]:
     kept_bytes = len(head.encode()) + len(tail.encode())
     omitted = len(data) - kept_bytes
     marker = f"\n... [copout omitted {omitted} UTF-8 bytes] ...\n"
-    bounded = head + marker + tail
-
-    return bounded, omitted
+    return head + marker + tail, omitted
 
 
 def _semantic_record(record: CopoutRecord) -> CopoutRecord:
@@ -198,104 +196,148 @@ def _output_attributes(output: OutputRecord) -> list[str]:
     return attrs
 
 
+def _self_closing_tag(
+    name: str,
+    attrs: list[str],
+    *,
+    indent: str,
+    pretty_attributes: bool,
+) -> str:
+    return (
+        _opening_tag(name, attrs, indent=indent, pretty_attributes=pretty_attributes)[:-1] + "/>"
+    )
+
+
 def _render_environment(
     environment: EnvironmentContext,
     *,
     pretty_attributes: bool,
 ) -> list[str]:
-    scalar_names = (
-        "login_shell",
-        "shell_version",
-        "os",
-        "os_version",
-        "arch",
-        "hostname",
-        "session_id",
-    )
-    attrs = [_attribute(name, environment[name]) for name in scalar_names if name in environment]
-    children: list[str] = []
+    attrs: list[str] = []
+    if (value := environment.get("login_shell")) is not None:
+        attrs.append(_attribute("login_shell", value))
+    if (value := environment.get("shell_version")) is not None:
+        attrs.append(_attribute("shell_version", value))
+    if (value := environment.get("os")) is not None:
+        attrs.append(_attribute("os", value))
+    if (value := environment.get("os_version")) is not None:
+        attrs.append(_attribute("os_version", value))
+    if (value := environment.get("arch")) is not None:
+        attrs.append(_attribute("arch", value))
+    if (value := environment.get("hostname")) is not None:
+        attrs.append(_attribute("hostname", value))
+    if (value := environment.get("session_id")) is not None:
+        attrs.append(_attribute("session_id", value))
 
+    children: list[str] = []
     if python_context := environment.get("python"):
-        python_attrs = [_attribute(name, value) for name, value in python_context.items()]
+        python_attrs: list[str] = []
+        if (value := python_context.get("executable")) is not None:
+            python_attrs.append(_attribute("executable", value))
+        if (value := python_context.get("version")) is not None:
+            python_attrs.append(_attribute("version", value))
+        if (value := python_context.get("implementation")) is not None:
+            python_attrs.append(_attribute("implementation", value))
+        if (value := python_context.get("environment")) is not None:
+            python_attrs.append(_attribute("environment", value))
         children.append(
-            _opening_tag(
+            _self_closing_tag(
                 "python",
                 python_attrs,
                 indent="    ",
                 pretty_attributes=pretty_attributes,
-            )[:-1]
-            + "/>"
+            )
         )
 
     for name, value in environment.get("env", {}).items():
         children.append(
-            _opening_tag(
+            _self_closing_tag(
                 "variable",
                 [_attribute("name", name), _attribute("value", value)],
                 indent="    ",
                 pretty_attributes=pretty_attributes,
-            )[:-1]
-            + "/>"
+            )
         )
 
     for name, path in environment.get("executables", {}).items():
         children.append(
-            _opening_tag(
+            _self_closing_tag(
                 "executable",
                 [_attribute("name", name), _attribute("path", path)],
                 indent="    ",
                 pretty_attributes=pretty_attributes,
-            )[:-1]
-            + "/>"
+            )
         )
 
-    opening = _opening_tag(
-        "environment",
-        attrs,
-        indent="  ",
-        pretty_attributes=pretty_attributes,
-    )
     if not children:
-        return [opening[:-1] + "/>" ]
-    return [opening, *children, "  </environment>"]
+        return [
+            _self_closing_tag(
+                "environment",
+                attrs,
+                indent="  ",
+                pretty_attributes=pretty_attributes,
+            )
+        ]
+    return [
+        _opening_tag(
+            "environment",
+            attrs,
+            indent="  ",
+            pretty_attributes=pretty_attributes,
+        ),
+        *children,
+        "  </environment>",
+    ]
 
 
 def _render_git(git: GitContext, *, indent: str, pretty_attributes: bool) -> list[str]:
-    scalar_names = (
-        "observed_at_capture",
-        "root",
-        "branch",
-        "detached",
-        "commit",
-        "dirty",
-        "upstream",
-        "ahead",
-        "behind",
-        "remote_url",
-        "diff_truncated",
-    )
     attrs: list[str] = []
-    for name in scalar_names:
-        if name not in git:
-            continue
-        value = git[name]
-        if isinstance(value, bool):
-            value = str(value).lower()
-        attrs.append(_attribute(name, value))
+    if (value := git.get("observed_at_capture")) is not None:
+        attrs.append(_attribute("observed_at_capture", str(value).lower()))
+    if (value := git.get("root")) is not None:
+        attrs.append(_attribute("root", value))
+    if (value := git.get("branch")) is not None:
+        attrs.append(_attribute("branch", value))
+    if (value := git.get("detached")) is not None:
+        attrs.append(_attribute("detached", str(value).lower()))
+    if (value := git.get("commit")) is not None:
+        attrs.append(_attribute("commit", value))
+    if (value := git.get("dirty")) is not None:
+        attrs.append(_attribute("dirty", str(value).lower()))
+    if (value := git.get("upstream")) is not None:
+        attrs.append(_attribute("upstream", value))
+    if (value := git.get("ahead")) is not None:
+        attrs.append(_attribute("ahead", value))
+    if (value := git.get("behind")) is not None:
+        attrs.append(_attribute("behind", value))
+    if (value := git.get("remote_url")) is not None:
+        attrs.append(_attribute("remote_url", value))
+    if (value := git.get("diff_truncated")) is not None:
+        attrs.append(_attribute("diff_truncated", str(value).lower()))
 
     children = [
         _element("changed-file", path, indent=f"{indent}  ", pretty_attributes=pretty_attributes)
         for path in git.get("changed_files", [])
     ]
-    if "diff" in git:
+    if (diff := git.get("diff")) is not None:
         children.append(
-            _element("diff", git["diff"], indent=f"{indent}  ", pretty_attributes=pretty_attributes)
+            _element("diff", diff, indent=f"{indent}  ", pretty_attributes=pretty_attributes)
         )
 
-    opening = _opening_tag("git", attrs, indent=indent, pretty_attributes=pretty_attributes)
     if not children:
-        return [opening[:-1] + "/>" ]
-    return [opening, *children, f"{indent}</git>"]
+        return [
+            _self_closing_tag(
+                "git",
+                attrs,
+                indent=indent,
+                pretty_attributes=pretty_attributes,
+            )
+        ]
+    return [
+        _opening_tag("git", attrs, indent=indent, pretty_attributes=pretty_attributes),
+        *children,
+        f"{indent}</git>",
+    ]
 
 
 def _render_run(
@@ -362,11 +404,19 @@ def _inline_value(value: str) -> str:
 
 def _markdown_environment(environment: EnvironmentContext) -> list[str]:
     details: list[str] = []
-    for name in ("os", "arch", "login_shell", "hostname", "session_id"):
-        if value := environment.get(name):
-            details.append(f"{name} {_inline_value(str(value))}")
+    if value := environment.get("os"):
+        details.append(f"os {_inline_value(value)}")
+    if value := environment.get("arch"):
+        details.append(f"arch {_inline_value(value)}")
+    if value := environment.get("login_shell"):
+        details.append(f"login_shell {_inline_value(value)}")
+    if value := environment.get("hostname"):
+        details.append(f"hostname {_inline_value(value)}")
+    if value := environment.get("session_id"):
+        details.append(f"session_id {_inline_value(value)}")
     if python_context := environment.get("python"):
-        details.append(f"python {_inline_value(python_context.get('version', ''))}")
+        if version := python_context.get("version"):
+            details.append(f"python {_inline_value(version)}")
     return details
 
 
