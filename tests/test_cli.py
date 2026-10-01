@@ -13,6 +13,7 @@ def _record_fixture(*, context_options=None) -> dict:
         "version": 7,
         "scope": "command",
         "source": "atuin",
+        "captured_at": "2026-10-01T09:30:00-04:00",
         "history_id": "abc",
         "command": "echo hi",
         "result": {"status": 0},
