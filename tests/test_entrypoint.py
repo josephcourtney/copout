@@ -129,6 +129,7 @@ def command_env(tmp_path: Path) -> CommandEnvironment:
     )
     env = dict(os.environ)
     for key in (
+        "COPOUT_CONFIG",
         "HISTORY_ERROR",
         "MALFORMED_HISTORY",
         "OUTPUT_ERROR",
@@ -144,6 +145,7 @@ def command_env(tmp_path: Path) -> CommandEnvironment:
     env.update(
         PATH=str(bin_dir),
         PYTHONPATH=os.pathsep.join((str(tmp_path), str(Path(__file__).parents[1] / "src"))),
+        XDG_CONFIG_HOME=str(tmp_path / "config"),
         ATUIN_SESSION="test-session",
         ATUIN_PTY_PROXY_ACTIVE="1",
         CLIPBOARD_FILE=str(clipboard),
