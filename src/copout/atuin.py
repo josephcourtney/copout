@@ -5,6 +5,7 @@ import os
 import re
 import shlex
 import shutil
+from collections.abc import Collection
 from dataclasses import dataclass, replace
 
 from jerakeen import AtuinUnsupportedError, connect
@@ -179,8 +180,17 @@ async def _add_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
         return list(await asyncio.gather(*(populate(entry) for entry in entries)))
 
 
-def recent_history(count: int, *, failed_only: bool = False) -> list[HistoryEntry]:
-    """Return recent matching history newest-first without contacting the daemon."""
+def recent_history(
+    count: int,
+    *,
+    failed_only: bool = False,
+    required_ids: Collection[str] = (),
+) -> list[HistoryEntry]:
+    """Return recent matching history newest-first without contacting the daemon.
+
+    required_ids extends the normal candidate window so integrations can select
+    exact Atuin records without falling back to command-text or history-offset matching.
+    """
 
     def selected(entry: HistoryEntry) -> bool:
         if _is_copout_command(entry.command):
@@ -188,8 +198,13 @@ def recent_history(count: int, *, failed_only: bool = False) -> list[HistoryEntr
         return not failed_only or (entry.exit_status is not None and entry.exit_status != 0)
 
     requested = max(count, 1)
-    return [entry for entry in _load_history() if selected(entry)][:requested]
-
+    required = set(required_ids)
+    entries = [entry for entry in _load_history() if selected(entry)]
+    return [
+        entry
+        for index, entry in enumerate(entries)
+        if index < requested or entry.id in required
+    ]
 
 def hydrate_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
     """Fetch captured output only for the supplied history entries."""

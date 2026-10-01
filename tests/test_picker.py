@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from textual.widgets import SelectionList
+from textual.widgets import SelectionList, Static
 
 from copout import picker
 from copout.atuin import HistoryEntry
@@ -29,6 +29,27 @@ def test_picker_toggles_multiple_commands_and_confirms_oldest_first() -> None:
             await pilot.press("enter")
 
         assert app.return_value == [2, 0]
+
+    asyncio.run(exercise())
+
+
+def test_picker_preselects_records_by_id() -> None:
+    async def exercise() -> None:
+        app = picker.CommandPicker(
+            [
+                HistoryEntry("3", "newest"),
+                HistoryEntry("2", "middle"),
+                HistoryEntry("1", "oldest"),
+            ],
+            preselected_ids=["2", "1"],
+        )
+        async with app.run_test(size=(100, 16)) as pilot:
+            choices = app.query_one("#commands", SelectionList)
+            assert choices.selected == [1, 2]
+            assert "2 selected" in str(app.query_one("#picker-help", Static).render())
+            await pilot.press("enter")
+
+        assert app.return_value == [2, 1]
 
     asyncio.run(exercise())
 

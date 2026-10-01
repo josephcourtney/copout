@@ -87,16 +87,21 @@ def run(
             writer.abort()
 
 
-def _pick_entries(candidates: list[atuin.HistoryEntry]) -> list[atuin.HistoryEntry] | None:
+def _pick_entries(
+    candidates: list[atuin.HistoryEntry],
+    *,
+    preselected_ids: list[str] | None = None,
+) -> list[atuin.HistoryEntry] | None:
     # Keep Textual off the startup path for normal and explicit-selection invocations.
     from . import picker  # noqa: PLC0415
 
-    return picker.pick_entries(candidates)
+    return picker.pick_entries(candidates, preselected_ids=preselected_ids or ())
 
 
 def run_pick(
     *,
     selectors: list[str],
+    preselect_records: list[str],
     limit: int,
     print_output: bool,
     as_json: bool,
@@ -104,7 +109,19 @@ def run_pick(
     pretty_attributes: bool,
 ) -> int:
     try:
-        candidates = atuin.recent_history(limit)
+        record_ids = selection.parse_record_ids(preselect_records) if preselect_records else []
+        if selectors and record_ids:
+            raise selection.SelectionError(
+                "command selectors and --preselect-records cannot be combined"
+            )
+        candidates = (
+            atuin.recent_history(limit, required_ids=record_ids)
+            if record_ids
+            else atuin.recent_history(limit)
+        )
+    except selection.SelectionError as exc:
+        print(f"copout: {exc}", file=sys.stderr)
+        return 2
     except record.AtuinError as exc:
         return _report_atuin_error(exc)
 
@@ -112,7 +129,9 @@ def run_pick(
         if selectors:
             selected = selection.select_entries(candidates, selectors)
         else:
-            selected = _pick_entries(candidates)
+            if record_ids:
+                selection.select_entries_by_ids(candidates, record_ids)
+            selected = _pick_entries(candidates, preselected_ids=record_ids)
             if selected is None:
                 return 0
     except selection.SelectionError as exc:
@@ -186,6 +205,13 @@ def pick_command(
         list[str] | None,
         typer.Argument(help="Recent command numbers or ranges, for example: 1 3 5-7."),
     ] = None,
+    preselect_records: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--preselect-records",
+            help="Open the picker with these Atuin record IDs selected; values may be comma-separated.",
+        ),
+    ] = None,
     limit: Annotated[
         int,
         typer.Option("--limit", "-l", min=1, help="Number of recent commands available to pick."),
@@ -211,6 +237,7 @@ def pick_command(
     raise typer.Exit(
         run_pick(
             selectors=selectors or [],
+            preselect_records=preselect_records or [],
             limit=limit,
             print_output=print_output,
             as_json=as_json,

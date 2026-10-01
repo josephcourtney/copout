@@ -48,6 +48,7 @@ copout pick             # inline checklist for recent commands
 copout pick 1 3 6       # choose non-contiguous recent commands
 copout pick 2-4 8       # ranges are inclusive
 copout pick --limit 250 # browse farther back in the interactive picker
+copout pick --preselect-records id1,id2 # open with exact Atuin records selected
 copout doctor           # detailed integration diagnostics
 copout verify           # concise history + output assertion
 ```
@@ -55,6 +56,8 @@ copout verify           # concise history + output assertion
 `copout pick` numbers candidate commands newest-first after excluding Copout commands: `1` is the same command selected by bare `copout`, `2` is the command before that, and so on. Selected runs are emitted chronologically. Explicit selectors are noninteractive. With no selectors, Copout opens a bounded inline checklist over the 100 most recent commands by default. Use Up/Down, Page Up/Page Down, Home/End to move, Space to toggle commands, Enter to copy the accumulated selection, and Esc or `q` to cancel without touching the clipboard. The list scrolls within the inline region rather than printing the entire candidate window into shell history.
 
 Picker discovery reads only Atuin history metadata. Copout asks the daemon for output only after the selection is known, and then only for the selected commands. The Textual UI is imported only for interactive `copout pick`, so the normal `copout`, `-n`, and explicit `copout pick 1 4 6` paths do not pay its startup cost. Picker drawing is routed to the controlling terminal rather than structured stdout, so `copout pick -p > context.xml` remains usable; `copout pick 1 4 6 -p > context.xml` is fully noninteractive.
+
+For shell integrations such as a runbook, `copout pick --preselect-records id1,id2,...` opens the normal picker with those exact Atuin record IDs already selected. The record IDs are the identity boundary: Copout does not try to match command text, and required records are included even when they fall outside the normal picker limit. Unknown IDs are rejected rather than silently ignored. This keeps the integration based on Atuin's existing command records without adding a Copout watcher or command journal.
 
 Copout retrieves persisted chronological history with `atuin history list --session` and retrieves recent captured output from the Atuin daemon through Jerakeen. It does not access Atuin's private database or implement the daemon gRPC protocol itself.
 

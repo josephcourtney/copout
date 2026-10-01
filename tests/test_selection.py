@@ -33,6 +33,26 @@ def test_select_entries_returns_oldest_first() -> None:
     ]
 
 
+def test_parse_record_ids_deduplicates_comma_separated_values() -> None:
+    assert selection.parse_record_ids(["id3,id2", "id3"]) == ["id3", "id2"]
+
+
+def test_select_entries_by_ids_returns_oldest_first() -> None:
+    entries = [
+        HistoryEntry("id3", "newest"),
+        HistoryEntry("id2", "middle"),
+        HistoryEntry("id1", "oldest"),
+    ]
+    selected = selection.select_entries_by_ids(entries, ["id3", "id1"])
+    assert [entry.command for entry in selected] == ["oldest", "newest"]
+
+
+def test_select_entries_by_ids_rejects_unknown_ids() -> None:
+    entries = [HistoryEntry("id1", "only")]
+    with pytest.raises(selection.SelectionError, match="id2"):
+        selection.select_entries_by_ids(entries, ["id2"])
+
+
 def test_candidate_lines_are_compact() -> None:
     entries = [
         HistoryEntry("2", "echo one\necho two", exit_status=0, duration=0.012),

@@ -52,6 +52,13 @@ def test_help_is_available_with_long_option() -> None:
     assert "Copy recent structured terminal history from Atuin" in result.stdout
 
 
+def test_pick_help_describes_record_preselection() -> None:
+    result = runner.invoke(cli.app, ["pick", "--help"])
+
+    assert result.exit_code == 0
+    assert "--preselect-records" in result.stdout
+
+
 def test_atuin_failure_goes_to_stderr_and_returns_exit_3(monkeypatch) -> None:
     def fail() -> dict:
         raise record.AtuinError("history unavailable")

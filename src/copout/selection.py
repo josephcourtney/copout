@@ -60,6 +60,41 @@ def select_entries(entries: Sequence[HistoryEntry], tokens: Sequence[str]) -> li
     return [entries[index] for index in indices]
 
 
+def parse_record_ids(tokens: Sequence[str]) -> list[str]:
+    """Return unique non-empty record IDs from comma-separated option values."""
+    record_ids: list[str] = []
+    seen: set[str] = set()
+    for token in tokens:
+        for raw_id in token.split(","):
+            record_id = raw_id.strip()
+            if not record_id:
+                raise SelectionError(f"invalid empty record ID in {token!r}")
+            if record_id not in seen:
+                seen.add(record_id)
+                record_ids.append(record_id)
+    if not record_ids:
+        raise SelectionError("no records selected")
+    return record_ids
+
+
+def select_entries_by_ids(
+    entries: Sequence[HistoryEntry], record_ids: Sequence[str]
+) -> list[HistoryEntry]:
+    """Return the requested records chronologically, rejecting unknown IDs."""
+    if not record_ids:
+        raise SelectionError("no records selected")
+
+    requested = set(record_ids)
+    found = {entry.id for entry in entries}
+    missing = [record_id for record_id in record_ids if record_id not in found]
+    if missing:
+        ids = ", ".join(missing)
+        raise SelectionError(f"record ID(s) not available: {ids}")
+
+    # Candidates are newest-first; emit selected records oldest-first.
+    return [entry for entry in reversed(entries) if entry.id in requested]
+
+
 def _duration_text(seconds: float | None) -> str:
     if seconds is None:
         return "-"

@@ -24,6 +24,15 @@ def test_recent_history_does_not_fetch_output(monkeypatch) -> None:
     assert atuin.recent_history(20) == [entry]
 
 
+def test_recent_history_includes_required_records_beyond_limit(monkeypatch) -> None:
+    entries = [HistoryEntry(str(index), f"cmd {index}") for index in range(5, 0, -1)]
+    monkeypatch.setattr(atuin, "_load_history", lambda: entries)
+
+    result = atuin.recent_history(2, required_ids=["1"])
+
+    assert [entry.id for entry in result] == ["5", "4", "1"]
+
+
 def test_hydrate_outputs_fetches_only_supplied_entries(monkeypatch) -> None:
     calls: list[str] = []
 
@@ -59,6 +68,56 @@ def test_pick_explicit_selectors_are_noninteractive(monkeypatch) -> None:
     assert result.stderr == ""
     assert result.stdout.index("oldest") < result.stdout.index("newest")
     assert "middle" not in result.stdout
+
+
+def test_pick_preselects_record_ids(monkeypatch) -> None:
+    entries = [
+        HistoryEntry("3", "newest"),
+        HistoryEntry("2", "middle"),
+        HistoryEntry("1", "oldest"),
+    ]
+    calls: list[tuple[int, list[str]]] = []
+
+    def recent_history(limit: int, *, required_ids=()):
+        calls.append((limit, list(required_ids)))
+        return entries
+
+    monkeypatch.setattr(cli.atuin, "recent_history", recent_history)
+    monkeypatch.setattr(cli.atuin, "hydrate_outputs", lambda selected: selected)
+
+    def pick(candidates, *, preselected_ids=None):
+        assert candidates == entries
+        assert preselected_ids == ["2", "1"]
+        return [candidates[2], candidates[1]]
+
+    monkeypatch.setattr(cli, "_pick_entries", pick)
+
+    result = runner.invoke(cli.app, ["pick", "--preselect-records", "2,1", "--print"])
+
+    assert result.exit_code == 0, result.stderr
+    assert [entry for entry in calls[0][1]] == ["2", "1"]
+    assert result.stdout.index("oldest") < result.stdout.index("middle")
+    assert "newest" not in result.stdout
+
+
+def test_pick_rejects_unknown_preselected_record(monkeypatch) -> None:
+    monkeypatch.setattr(
+        cli.atuin,
+        "recent_history",
+        lambda limit, *, required_ids=(): [HistoryEntry("1", "only")],
+    )
+
+    result = runner.invoke(cli.app, ["pick", "--preselect-records", "missing", "--print"])
+
+    assert result.exit_code == 2
+    assert "record ID(s) not available: missing" in result.stderr
+
+
+def test_pick_rejects_mixed_selector_modes() -> None:
+    result = runner.invoke(cli.app, ["pick", "1", "--preselect-records", "id1"])
+
+    assert result.exit_code == 2
+    assert "cannot be combined" in result.stderr
 
 
 def test_pick_markdown_output(monkeypatch) -> None:

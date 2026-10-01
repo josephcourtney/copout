@@ -51,14 +51,24 @@ class CommandPicker(App[list[int] | None]):
         Binding("ctrl+c", "cancel", "Cancel", show=False, priority=True),
     ]
 
-    def __init__(self, entries: Sequence[HistoryEntry]) -> None:
+    def __init__(
+        self,
+        entries: Sequence[HistoryEntry],
+        *,
+        preselected_ids: Sequence[str] = (),
+    ) -> None:
         super().__init__()
         self._entries = list(entries)
+        self._preselected_ids = set(preselected_ids)
 
     def compose(self) -> ComposeResult:
-        options = [(line, index) for index, line in enumerate(candidate_lines(self._entries))]
+        options = [
+            (line, index, self._entries[index].id in self._preselected_ids)
+            for index, line in enumerate(candidate_lines(self._entries))
+        ]
         yield SelectionList[int](*options, id="commands", compact=True)
-        yield Static(self._help_text(0), id="picker-help")
+        selected_count = sum(entry.id in self._preselected_ids for entry in self._entries)
+        yield Static(self._help_text(selected_count), id="picker-help")
 
     def on_mount(self) -> None:
         choices = self.query_one("#commands", SelectionList)
@@ -108,7 +118,11 @@ def _terminal_streams() -> Iterator[tuple[TextIO, TextIO]]:
         ) from exc
 
 
-def pick_entries(entries: Sequence[HistoryEntry]) -> list[HistoryEntry] | None:
+def pick_entries(
+    entries: Sequence[HistoryEntry],
+    *,
+    preselected_ids: Sequence[str] = (),
+) -> list[HistoryEntry] | None:
     """Run the inline picker and return selected entries chronologically, or None on cancel."""
     if not entries:
         raise SelectionError("no recent commands are available")
@@ -121,7 +135,7 @@ def pick_entries(entries: Sequence[HistoryEntry]) -> list[HistoryEntry] | None:
             # controlling terminal so `copout pick -p > context.xml` stays clean.
             sys.stdin = input_stream
             sys.stdout = output_stream
-            indexes = CommandPicker(entries).run(
+            indexes = CommandPicker(entries, preselected_ids=preselected_ids).run(
                 inline=True,
                 inline_no_clear=False,
                 mouse=False,
