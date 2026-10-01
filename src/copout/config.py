@@ -89,9 +89,11 @@ def _parse_context(data: object) -> ContextOptions:
 
 
 def load_context_options(path: Path | None = None) -> ContextOptions:
+    environment_path = os.environ.get("COPOUT_CONFIG")
+    explicit = path is not None or environment_path is not None
     config_path = default_config_path() if path is None else path.expanduser()
     if not config_path.exists():
-        if path is not None:
+        if explicit:
             raise ConfigError(f"config file does not exist: {config_path}")
         return _DEFAULT_CONFIG
 
