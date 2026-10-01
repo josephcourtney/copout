@@ -248,11 +248,16 @@ def cli(
     ] = None,
     git_context: Annotated[
         bool | None,
-        typer.Option("--git-context/--no-git-context", help="Include current Git state for each cwd."),
+        typer.Option(
+            "--git-context/--no-git-context", help="Include current Git state for each cwd."
+        ),
     ] = None,
     git_extended: Annotated[
         bool | None,
-        typer.Option("--git-extended/--no-git-extended", help="Include upstream, divergence, remote, and changed files."),
+        typer.Option(
+            "--git-extended/--no-git-extended",
+            help="Include upstream, divergence, remote, and changed files.",
+        ),
     ] = None,
     git_diff: Annotated[
         bool | None,
@@ -260,7 +265,10 @@ def cli(
     ] = None,
     system_context: Annotated[
         bool | None,
-        typer.Option("--system-context/--no-system-context", help="Include shell, platform, architecture, and Atuin session."),
+        typer.Option(
+            "--system-context/--no-system-context",
+            help="Include shell, platform, architecture, and Atuin session.",
+        ),
     ] = None,
     hostname_context: Annotated[
         bool | None,
@@ -276,7 +284,10 @@ def cli(
     ] = None,
     python_context: Annotated[
         bool | None,
-        typer.Option("--python-context/--no-python-context", help="Include Python interpreter/environment details."),
+        typer.Option(
+            "--python-context/--no-python-context",
+            help="Include Python interpreter/environment details.",
+        ),
     ] = None,
     env_vars: Annotated[
         list[str] | None,
@@ -284,7 +295,9 @@ def cli(
     ] = None,
     executables: Annotated[
         list[str] | None,
-        typer.Option("--resolve", help="Include the resolved path of this executable; repeat as needed."),
+        typer.Option(
+            "--resolve", help="Include the resolved path of this executable; repeat as needed."
+        ),
     ] = None,
 ) -> None:
     """Copy recent Atuin command history and captured output."""
@@ -360,11 +373,16 @@ def pick_command(
     ] = None,
     git_context: Annotated[
         bool | None,
-        typer.Option("--git-context/--no-git-context", help="Include current Git state for each cwd."),
+        typer.Option(
+            "--git-context/--no-git-context", help="Include current Git state for each cwd."
+        ),
     ] = None,
     git_extended: Annotated[
         bool | None,
-        typer.Option("--git-extended/--no-git-extended", help="Include upstream, divergence, remote, and changed files."),
+        typer.Option(
+            "--git-extended/--no-git-extended",
+            help="Include upstream, divergence, remote, and changed files.",
+        ),
     ] = None,
     git_diff: Annotated[
         bool | None,
@@ -372,7 +390,10 @@ def pick_command(
     ] = None,
     system_context: Annotated[
         bool | None,
-        typer.Option("--system-context/--no-system-context", help="Include shell, platform, architecture, and Atuin session."),
+        typer.Option(
+            "--system-context/--no-system-context",
+            help="Include shell, platform, architecture, and Atuin session.",
+        ),
     ] = None,
     hostname_context: Annotated[
         bool | None,
@@ -388,7 +409,10 @@ def pick_command(
     ] = None,
     python_context: Annotated[
         bool | None,
-        typer.Option("--python-context/--no-python-context", help="Include Python interpreter/environment details."),
+        typer.Option(
+            "--python-context/--no-python-context",
+            help="Include Python interpreter/environment details.",
+        ),
     ] = None,
     env_vars: Annotated[
         list[str] | None,
@@ -396,7 +420,9 @@ def pick_command(
     ] = None,
     executables: Annotated[
         list[str] | None,
-        typer.Option("--resolve", help="Include the resolved path of this executable; repeat as needed."),
+        typer.Option(
+            "--resolve", help="Include the resolved path of this executable; repeat as needed."
+        ),
     ] = None,
 ) -> None:
     """Choose arbitrary recent commands and copy them as one history record."""

@@ -128,7 +128,9 @@ def _entry_record(entry: HistoryEntry, git: context_capture.GitContext | None = 
     }
 
 
-def _git_context(entry: HistoryEntry, options: ContextOptions | None) -> context_capture.GitContext | None:
+def _git_context(
+    entry: HistoryEntry, options: ContextOptions | None
+) -> context_capture.GitContext | None:
     if options is None:
         return None
     return context_capture.capture_git_context(entry.cwd, options)

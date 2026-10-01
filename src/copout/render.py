@@ -203,9 +203,7 @@ def _self_closing_tag(
     indent: str,
     pretty_attributes: bool,
 ) -> str:
-    return (
-        _opening_tag(name, attrs, indent=indent, pretty_attributes=pretty_attributes)[:-1] + "/>"
-    )
+    return _opening_tag(name, attrs, indent=indent, pretty_attributes=pretty_attributes)[:-1] + "/>"
 
 
 def _render_environment(
@@ -373,9 +371,7 @@ def _render_run(
         pretty_attributes=pretty_attributes,
     ).splitlines()
     if git := run["context"].get("git"):
-        lines.extend(
-            _render_git(git, indent=f"{indent}  ", pretty_attributes=pretty_attributes)
-        )
+        lines.extend(_render_git(git, indent=f"{indent}  ", pretty_attributes=pretty_attributes))
     lines.append(
         _element(
             "command",
@@ -422,9 +418,8 @@ def _markdown_environment(environment: EnvironmentContext) -> list[str]:
         details.append(f"hostname {_inline_value(value)}")
     if value := environment.get("session_id"):
         details.append(f"session_id {_inline_value(value)}")
-    if python_context := environment.get("python"):
-        if version := python_context.get("version"):
-            details.append(f"python {_inline_value(version)}")
+    if (python_context := environment.get("python")) and (version := python_context.get("version")):
+        details.append(f"python {_inline_value(version)}")
     return details
 
 
