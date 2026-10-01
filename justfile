@@ -9,28 +9,33 @@ UV := "uv"
 help:
   @printf '%s\n' \
     'Copout development commands:' \
-    '  just setup                 Install/sync development dependencies' \
-    '  just fix                   Apply Ruff formatting and automatic lint fixes' \
-    '  just repair                Sync, fix, then run the full validation suite' \
-    '  just lint                  Ruff check with automatic fixes' \
-    '  just lint --unsafe-fixes   Also apply Ruff unsafe fixes' \
-    '  just format                Apply Ruff formatting' \
-    '  just typecheck             ty type checking' \
-    '  just test                  pytest' \
-    '  just check                 Run non-mutating lint, format, typecheck, and tests' \
-    '  just build                 Build wheel and sdist'
+    '  just setup                    Install/sync development dependencies' \
+    '  just fix                      Apply Ruff formatting and automatic lint fixes' \
+    '  just fix --unsafe-fixes       Also apply Ruff unsafe fixes' \
+    '  just repair                   Sync, fix, typecheck, and test' \
+    '  just repair --unsafe-fixes    Also apply Ruff unsafe fixes' \
+    '  just lint                     Ruff check with automatic fixes' \
+    '  just lint --unsafe-fixes      Also apply Ruff unsafe fixes' \
+    '  just format                   Apply Ruff formatting' \
+    '  just typecheck                ty type checking' \
+    '  just test                     pytest' \
+    '  just check                    Run non-mutating lint, format, typecheck, and tests' \
+    '  just build                    Build wheel and sdist'
 
 setup:
   {{UV}} sync
 
-fix:
+[arg("unsafe-fixes", long, value="true")]
+fix unsafe-fixes="false":
   just format
-  just lint
+  @if [ "{{unsafe-fixes}}" = "true" ]; then just lint --unsafe-fixes; else just lint; fi
 
-repair:
+[arg("unsafe-fixes", long, value="true")]
+repair unsafe-fixes="false":
   just setup
-  just fix
-  just check
+  @if [ "{{unsafe-fixes}}" = "true" ]; then just fix --unsafe-fixes; else just fix; fi
+  just typecheck
+  just test
 
 [arg("unsafe-fixes", long, value="true")]
 lint unsafe-fixes="false":
