@@ -304,6 +304,12 @@ def _render_git(git: GitContext, *, indent: str, pretty_attributes: bool) -> lis
         attrs.append(_attribute("commit", value))
     if (value := git.get("dirty")) is not None:
         attrs.append(_attribute("dirty", str(value).lower()))
+    if (value := git.get("git_dir")) is not None:
+        attrs.append(_attribute("git_dir", value))
+    if (value := git.get("common_dir")) is not None:
+        attrs.append(_attribute("common_dir", value))
+    if (value := git.get("linked_worktree")) is not None:
+        attrs.append(_attribute("linked_worktree", str(value).lower()))
     if (value := git.get("upstream")) is not None:
         attrs.append(_attribute("upstream", value))
     if (value := git.get("ahead")) is not None:
