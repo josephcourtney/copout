@@ -10,6 +10,8 @@ help:
   @printf '%s\n' \
     'Copout development commands:' \
     '  just setup      Install/sync development dependencies' \
+    '  just fix        Apply Ruff formatting and automatic lint fixes' \
+    '  just repair     Sync, fix, then run the full validation suite' \
     '  just lint       Ruff check' \
     '  just format     Ruff formatting check' \
     '  just typecheck  ty type checking' \
@@ -19,6 +21,15 @@ help:
 
 setup:
   {{UV}} sync
+
+fix:
+  {{RUFF}} format src tests
+  {{RUFF}} check --fix src tests
+
+repair:
+  just setup
+  just fix
+  just check
 
 lint:
   {{RUFF}} check src tests
