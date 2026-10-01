@@ -137,9 +137,9 @@ def test_live_shell_capture(tmp_path: Path) -> None:
         output.get("error") or "the real Atuin output cache did not capture the probe"
     )
 
-    # Atuin may retain terminal-cell padding and final blank rows in its capture. Copout removes
-    # whitespace only from the end of the complete captured output.
-    assert output["text"] == "copout-live-probe"
+    # Atuin records terminal output, so shell/theme prompt residue may follow the
+    # command's output. The probe itself must still be the first captured line.
+    assert output["text"].splitlines()[0] == "copout-live-probe"
 
 
 def test_live_clipboard_delivery_does_not_fork_after_grpc(tmp_path: Path) -> None:
