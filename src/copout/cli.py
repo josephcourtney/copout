@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from typing import Annotated
 
 import typer
 
 from . import atuin, clipboard, doctor, record, render, selection
+from .config import ConfigError, ContextOptions, load_context_options
 
 app = typer.Typer(
     add_completion=False,
@@ -53,6 +55,53 @@ def _report_atuin_error(exc: record.AtuinError) -> int:
     return 3
 
 
+def _context_options(
+    *,
+    config_path: Path | None,
+    context_enabled: bool | None,
+    git_context: bool | None,
+    git_extended: bool | None,
+    git_diff: bool | None,
+    system_context: bool | None,
+    hostname_context: bool | None,
+    shell_version: bool | None,
+    os_version: bool | None,
+    python_context: bool | None,
+    env_vars: list[str],
+    executables: list[str],
+) -> ContextOptions:
+    try:
+        options = load_context_options(config_path)
+    except ConfigError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--config") from exc
+
+    overrides: dict[str, bool | None] = {
+        "enabled": context_enabled,
+        "git": git_context,
+        "git_extended": git_extended,
+        "git_diff": git_diff,
+        "hostname": hostname_context,
+        "shell_version": shell_version,
+        "os_version": os_version,
+        "python": python_context,
+    }
+    if system_context is not None:
+        overrides.update(
+            shell=system_context,
+            platform=system_context,
+            session=system_context,
+        )
+    options = options.with_overrides(**overrides)
+
+    if env_vars:
+        options = options.with_overrides(env=tuple(dict.fromkeys((*options.env, *env_vars))))
+    if executables:
+        options = options.with_overrides(
+            executables=tuple(dict.fromkeys((*options.executables, *executables)))
+        )
+    return options
+
+
 def run(
     *,
     print_output: bool,
@@ -61,6 +110,7 @@ def run(
     pretty_attributes: bool,
     count: int,
     failure: bool,
+    context_options: ContextOptions | None = None,
 ) -> int:
     writer, error_code = _start_writer(print_output=print_output)
     if error_code is not None:
@@ -69,9 +119,13 @@ def run(
     try:
         try:
             captured = (
-                record.build_record()
+                record.build_record(context_options=context_options)
                 if count == 1 and not failure
-                else record.build_history(count=count, failed_only=failure)
+                else record.build_history(
+                    count=count,
+                    failed_only=failure,
+                    context_options=context_options,
+                )
             )
         except record.AtuinError as exc:
             return _report_atuin_error(exc)
@@ -92,7 +146,6 @@ def _pick_entries(
     *,
     preselected_ids: list[str] | None = None,
 ) -> list[atuin.HistoryEntry] | None:
-    # Keep Textual off the startup path for normal and explicit-selection invocations.
     from . import picker  # noqa: PLC0415
 
     return picker.pick_entries(candidates, preselected_ids=preselected_ids or ())
@@ -107,6 +160,7 @@ def run_pick(
     as_json: bool,
     as_markdown: bool,
     pretty_attributes: bool,
+    context_options: ContextOptions | None = None,
 ) -> int:
     try:
         record_ids = selection.parse_record_ids(preselect_records) if preselect_records else []
@@ -144,7 +198,10 @@ def run_pick(
 
     try:
         hydrated = atuin.hydrate_outputs(selected)
-        captured = record.build_history_from_entries(hydrated)
+        captured = record.build_history_from_entries(
+            hydrated,
+            context_options=context_options,
+        )
         return _write_record(
             captured,
             writer=writer,
@@ -181,12 +238,74 @@ def cli(
         bool,
         typer.Option("--failure", help="Select the most recent failed command."),
     ] = False,
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Read context settings from this TOML file."),
+    ] = None,
+    context_enabled: Annotated[
+        bool | None,
+        typer.Option("--context/--no-context", help="Enable or disable all extra context."),
+    ] = None,
+    git_context: Annotated[
+        bool | None,
+        typer.Option("--git-context/--no-git-context", help="Include current Git state for each cwd."),
+    ] = None,
+    git_extended: Annotated[
+        bool | None,
+        typer.Option("--git-extended/--no-git-extended", help="Include upstream, divergence, remote, and changed files."),
+    ] = None,
+    git_diff: Annotated[
+        bool | None,
+        typer.Option("--git-diff/--no-git-diff", help="Include a bounded working-tree Git diff."),
+    ] = None,
+    system_context: Annotated[
+        bool | None,
+        typer.Option("--system-context/--no-system-context", help="Include shell, platform, architecture, and Atuin session."),
+    ] = None,
+    hostname_context: Annotated[
+        bool | None,
+        typer.Option("--hostname-context/--no-hostname-context", help="Include the hostname."),
+    ] = None,
+    shell_version: Annotated[
+        bool | None,
+        typer.Option("--shell-version/--no-shell-version", help="Include the login-shell version."),
+    ] = None,
+    os_version: Annotated[
+        bool | None,
+        typer.Option("--os-version/--no-os-version", help="Include the OS release/version."),
+    ] = None,
+    python_context: Annotated[
+        bool | None,
+        typer.Option("--python-context/--no-python-context", help="Include Python interpreter/environment details."),
+    ] = None,
+    env_vars: Annotated[
+        list[str] | None,
+        typer.Option("--env", help="Include this environment variable; repeat as needed."),
+    ] = None,
+    executables: Annotated[
+        list[str] | None,
+        typer.Option("--resolve", help="Include the resolved path of this executable; repeat as needed."),
+    ] = None,
 ) -> None:
     """Copy recent Atuin command history and captured output."""
     if ctx.invoked_subcommand is not None:
         return
     if as_json and as_markdown:
         raise typer.BadParameter("--json and --markdown cannot be combined")
+    options = _context_options(
+        config_path=config_path,
+        context_enabled=context_enabled,
+        git_context=git_context,
+        git_extended=git_extended,
+        git_diff=git_diff,
+        system_context=system_context,
+        hostname_context=hostname_context,
+        shell_version=shell_version,
+        os_version=os_version,
+        python_context=python_context,
+        env_vars=env_vars or [],
+        executables=executables or [],
+    )
     raise typer.Exit(
         run(
             print_output=print_output,
@@ -195,6 +314,7 @@ def cli(
             pretty_attributes=pretty_attributes,
             count=last,
             failure=failure,
+            context_options=options,
         )
     )
 
@@ -230,10 +350,72 @@ def pick_command(
             help="Put XML attributes on separate lines when an element has several.",
         ),
     ] = False,
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Read context settings from this TOML file."),
+    ] = None,
+    context_enabled: Annotated[
+        bool | None,
+        typer.Option("--context/--no-context", help="Enable or disable all extra context."),
+    ] = None,
+    git_context: Annotated[
+        bool | None,
+        typer.Option("--git-context/--no-git-context", help="Include current Git state for each cwd."),
+    ] = None,
+    git_extended: Annotated[
+        bool | None,
+        typer.Option("--git-extended/--no-git-extended", help="Include upstream, divergence, remote, and changed files."),
+    ] = None,
+    git_diff: Annotated[
+        bool | None,
+        typer.Option("--git-diff/--no-git-diff", help="Include a bounded working-tree Git diff."),
+    ] = None,
+    system_context: Annotated[
+        bool | None,
+        typer.Option("--system-context/--no-system-context", help="Include shell, platform, architecture, and Atuin session."),
+    ] = None,
+    hostname_context: Annotated[
+        bool | None,
+        typer.Option("--hostname-context/--no-hostname-context", help="Include the hostname."),
+    ] = None,
+    shell_version: Annotated[
+        bool | None,
+        typer.Option("--shell-version/--no-shell-version", help="Include the login-shell version."),
+    ] = None,
+    os_version: Annotated[
+        bool | None,
+        typer.Option("--os-version/--no-os-version", help="Include the OS release/version."),
+    ] = None,
+    python_context: Annotated[
+        bool | None,
+        typer.Option("--python-context/--no-python-context", help="Include Python interpreter/environment details."),
+    ] = None,
+    env_vars: Annotated[
+        list[str] | None,
+        typer.Option("--env", help="Include this environment variable; repeat as needed."),
+    ] = None,
+    executables: Annotated[
+        list[str] | None,
+        typer.Option("--resolve", help="Include the resolved path of this executable; repeat as needed."),
+    ] = None,
 ) -> None:
     """Choose arbitrary recent commands and copy them as one history record."""
     if as_json and as_markdown:
         raise typer.BadParameter("--json and --markdown cannot be combined")
+    options = _context_options(
+        config_path=config_path,
+        context_enabled=context_enabled,
+        git_context=git_context,
+        git_extended=git_extended,
+        git_diff=git_diff,
+        system_context=system_context,
+        hostname_context=hostname_context,
+        shell_version=shell_version,
+        os_version=os_version,
+        python_context=python_context,
+        env_vars=env_vars or [],
+        executables=executables or [],
+    )
     raise typer.Exit(
         run_pick(
             selectors=selectors or [],
@@ -243,6 +425,7 @@ def pick_command(
             as_json=as_json,
             as_markdown=as_markdown,
             pretty_attributes=pretty_attributes,
+            context_options=options,
         )
     )
 
