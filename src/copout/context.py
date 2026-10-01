@@ -6,6 +6,7 @@ import shutil
 import socket
 import subprocess
 import sys
+from pathlib import Path
 from typing import TypedDict
 
 from .config import ContextOptions
@@ -21,6 +22,9 @@ class GitContext(TypedDict, total=False):
     detached: bool
     commit: str
     dirty: bool
+    git_dir: str
+    common_dir: str
+    linked_worktree: bool
     upstream: str
     ahead: int
     behind: int
@@ -74,6 +78,13 @@ def _git(args: list[str], *, cwd: str) -> str | None:
     return result.stdout.strip()
 
 
+def _git_path(value: str, *, cwd: str) -> str:
+    path = Path(value)
+    if not path.is_absolute():
+        path = Path(cwd) / path
+    return str(path.resolve(strict=False))
+
+
 def _changed_files(cwd: str) -> list[str]:
     status = _git(["status", "--porcelain=v1", "--untracked-files=normal"], cwd=cwd)
     if not status:
@@ -112,6 +123,15 @@ def capture_git_context(cwd: str, options: ContextOptions) -> GitContext | None:
         result["dirty"] = bool(status)
 
     if options.git_extended:
+        git_dir = _git(["rev-parse", "--git-dir"], cwd=cwd)
+        common_dir = _git(["rev-parse", "--git-common-dir"], cwd=cwd)
+        if git_dir:
+            result["git_dir"] = _git_path(git_dir, cwd=cwd)
+        if common_dir:
+            result["common_dir"] = _git_path(common_dir, cwd=cwd)
+        if git_dir and common_dir:
+            result["linked_worktree"] = result["git_dir"] != result["common_dir"]
+
         upstream = _git(
             ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], cwd=cwd
         )
