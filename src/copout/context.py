@@ -6,7 +6,6 @@ import shutil
 import socket
 import subprocess
 import sys
-from pathlib import Path
 from typing import TypedDict
 
 from .config import ContextOptions
@@ -113,7 +112,9 @@ def capture_git_context(cwd: str, options: ContextOptions) -> GitContext | None:
         result["dirty"] = bool(status)
 
     if options.git_extended:
-        upstream = _git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], cwd=cwd)
+        upstream = _git(
+            ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], cwd=cwd
+        )
         if upstream:
             result["upstream"] = upstream
             counts = _git(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], cwd=cwd)
@@ -122,7 +123,7 @@ def capture_git_context(cwd: str, options: ContextOptions) -> GitContext | None:
                     ahead_text, behind_text = counts.split()
                     result["ahead"] = int(ahead_text)
                     result["behind"] = int(behind_text)
-                except (ValueError, TypeError):
+                except ValueError:
                     pass
 
             remote = upstream.split("/", 1)[0]
