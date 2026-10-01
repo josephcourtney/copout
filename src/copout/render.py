@@ -357,6 +357,8 @@ def _render_run(
         attrs.append(_attribute("cwd", cwd))
     if (duration := run["timing"]["duration"]) is not None:
         attrs.append(_attribute("duration_ms", _duration_ms(duration)))
+    if recorded_at := run["timing"].get("recorded_at"):
+        attrs.append(_attribute("recorded_at", recorded_at))
 
     lines = _opening_tag(
         "run",
@@ -425,6 +427,7 @@ def _render_markdown(record: CopoutRecord) -> str:
     if environment := record.get("environment"):
         details = _markdown_environment(environment)
         if details:
+            details.append(f"captured_at {_inline_value(record['captured_at'])}")
             lines.extend(("### Environment", "", " · ".join(details), ""))
 
     for index, run in enumerate(_record_runs(record), start=1):
@@ -438,6 +441,8 @@ def _render_markdown(record: CopoutRecord) -> str:
             details.append(f"cwd {_inline_value(cwd)}")
         if (duration := run["timing"]["duration"]) is not None:
             details.append(f"{_duration_ms(duration)} ms")
+        if recorded_at := run["timing"].get("recorded_at"):
+            details.append(f"recorded_at {_inline_value(recorded_at)}")
         if git := run["context"].get("git"):
             if branch := git.get("branch"):
                 details.append(f"git {_inline_value(branch)}")
@@ -476,7 +481,10 @@ def render(
     if as_json:
         return json.dumps(projected, indent=2, ensure_ascii=False) + "\n"
 
-    attrs = [_attribute("version", projected["version"])]
+    attrs = [
+        _attribute("version", projected["version"]),
+        _attribute("captured_at", projected["captured_at"]),
+    ]
     include_history_id = projected["scope"] == "history"
     runs = _record_runs(projected)
 
