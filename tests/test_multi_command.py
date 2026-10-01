@@ -95,7 +95,7 @@ def test_pick_preselects_record_ids(monkeypatch) -> None:
     result = runner.invoke(cli.app, ["pick", "--preselect-records", "2,1", "--print"])
 
     assert result.exit_code == 0, result.stderr
-    assert [entry for entry in calls[0][1]] == ["2", "1"]
+    assert list(calls[0][1]) == ["2", "1"]
     assert result.stdout.index("oldest") < result.stdout.index("middle")
     assert "newest" not in result.stdout
 
@@ -136,7 +136,11 @@ def test_pick_without_selectors_uses_inline_picker(monkeypatch) -> None:
     entries = [HistoryEntry("2", "newest"), HistoryEntry("1", "oldest")]
     monkeypatch.setattr(cli.atuin, "recent_history", lambda limit: entries)
     monkeypatch.setattr(cli.atuin, "hydrate_outputs", lambda selected: selected)
-    monkeypatch.setattr(cli, "_pick_entries", lambda candidates: [candidates[1]])
+    monkeypatch.setattr(
+        cli,
+        "_pick_entries",
+        lambda candidates, *, preselected_ids=None: [candidates[1]],
+    )
 
     result = runner.invoke(cli.app, ["pick", "--print"])
 
@@ -148,7 +152,11 @@ def test_pick_without_selectors_uses_inline_picker(monkeypatch) -> None:
 def test_pick_cancel_does_not_hydrate_or_touch_clipboard(monkeypatch) -> None:
     entries = [HistoryEntry("1", "newest")]
     monkeypatch.setattr(cli.atuin, "recent_history", lambda limit: entries)
-    monkeypatch.setattr(cli, "_pick_entries", lambda candidates: None)
+    monkeypatch.setattr(
+        cli,
+        "_pick_entries",
+        lambda candidates, *, preselected_ids=None: None,
+    )
 
     def must_not_hydrate(selected: list[HistoryEntry]) -> list[HistoryEntry]:
         del selected
