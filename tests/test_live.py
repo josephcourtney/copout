@@ -1,8 +1,10 @@
 """Checks against the user's real Atuin shell integration."""
 
+import errno
 import json
 import os
 import pty
+import select
 import shutil
 import signal
 import subprocess
@@ -14,6 +16,9 @@ from pathlib import Path
 import pytest
 
 _TIMEOUT = 20.0
+_READY = b"__COPOUT_READY__"
+_PROBE_DONE = b"__COPOUT_PROBE_DONE__"
+_QUERY_DONE = b"__COPOUT_QUERY_DONE__"
 
 
 def _require_live_shell() -> str:
@@ -29,17 +34,56 @@ def _send(fd: int, command: str) -> None:
     os.write(fd, command.encode() + b"\n")
 
 
-def _wait_for_child(pid: int, *, timeout: float = _TIMEOUT) -> int:
+def _read_until(fd: int, marker: bytes, *, timeout: float = _TIMEOUT) -> bytes:
+    deadline = time.monotonic() + timeout
+    output = bytearray()
+    while marker not in output:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            pytest.fail(f"timed out waiting for {marker!r}; terminal output: {bytes(output)!r}")
+        readable, _, _ = select.select([fd], [], [], remaining)
+        if not readable:
+            continue
+        try:
+            chunk = os.read(fd, 4096)
+        except OSError as exc:
+            if exc.errno == errno.EIO:
+                break
+            raise
+        if not chunk:
+            break
+        output.extend(chunk)
+    if marker not in output:
+        pytest.fail(f"shell exited before {marker!r}; terminal output: {bytes(output)!r}")
+    return bytes(output)
+
+
+def _wait_for_child(pid: int, fd: int, *, timeout: float = _TIMEOUT) -> int:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         waited_pid, status = os.waitpid(pid, os.WNOHANG)
         if waited_pid == pid:
             return status
-        time.sleep(0.05)
+
+        # Keep draining the PTY while the shell exits. Interactive startup and
+        # prompt themes can otherwise fill the PTY buffer and block the child.
+        readable, _, _ = select.select([fd], [], [], 0.05)
+        if readable:
+            try:
+                os.read(fd, 4096)
+            except OSError as exc:
+                if exc.errno != errno.EIO:
+                    raise
 
     os.kill(pid, signal.SIGTERM)
     os.waitpid(pid, 0)
     pytest.fail(f"interactive zsh did not exit within {timeout:g}s")
+
+
+def _marker_command(prefix: str, suffix: str) -> str:
+    # Keep the complete marker out of terminal input echo. _read_until() must
+    # observe command output, not merely the echoed command line.
+    return f"printf '%s\\n' '{prefix}''{suffix}'"
 
 
 def _run_probe_in_atuin_shell(output_path: Path) -> None:
@@ -53,14 +97,27 @@ def _run_probe_in_atuin_shell(output_path: Path) -> None:
     quoted_output = str(output_path).replace("'", "'\\''")
 
     try:
-        # These are separate interactive input lines, not one compound shell command.
-        # The PTY may queue them while zsh starts, but zsh still executes each line as
-        # its own command lifecycle. Atuin therefore finalizes the probe before Copout
-        # begins the following command.
+        # First establish that startup has completed and zsh is accepting commands.
+        _send(fd, _marker_command("__COPOUT_", "READY__"))
+        _read_until(fd, _READY)
+
+        # The barrier is a separate interactive command. It cannot execute until
+        # zsh has completed the probe lifecycle, including Atuin's post-command hook.
         _send(fd, "printf 'copout-live-probe\\n'")
-        _send(fd, f"'{quoted_launcher}' --print --json --last 10 > '{quoted_output}'")
+        _send(fd, _marker_command("__COPOUT_PROBE_", "DONE__"))
+        _read_until(fd, _PROBE_DONE)
+
+        # Query only after the probe has been finalized. The trailing marker lets
+        # us observe query completion while continuously draining PTY output.
+        _send(
+            fd,
+            f"'{quoted_launcher}' --print --json --last 10 > '{quoted_output}'; "
+            + _marker_command("__COPOUT_QUERY_", "DONE__"),
+        )
+        _read_until(fd, _QUERY_DONE)
+
         _send(fd, "exit")
-        status = _wait_for_child(pid)
+        status = _wait_for_child(pid, fd)
     finally:
         os.close(fd)
 
