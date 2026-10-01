@@ -98,10 +98,7 @@ def _metadata(context_options: ContextOptions | None = None) -> CaptureMetadata:
     return metadata
 
 
-def _entry_record(
-    entry: HistoryEntry,
-    context_options: ContextOptions | None = None,
-) -> RunRecord:
+def _entry_record(entry: HistoryEntry, git: context_capture.GitContext | None = None) -> RunRecord:
     captured = entry.output is not None
     text = entry.output or ""
     output: OutputRecord = {
@@ -118,10 +115,8 @@ def _entry_record(
         output["exit_capture_complete"] = entry.output_exit_capture_complete
 
     context: ContextRecord = {"cwd": entry.cwd}
-    if context_options is not None:
-        git = context_capture.capture_git_context(entry.cwd, context_options)
-        if git:
-            context["git"] = git
+    if git:
+        context["git"] = git
 
     return {
         "history_id": entry.id,
@@ -133,13 +128,20 @@ def _entry_record(
     }
 
 
+def _git_context(entry: HistoryEntry, options: ContextOptions | None) -> context_capture.GitContext | None:
+    if options is None:
+        return None
+    return context_capture.capture_git_context(entry.cwd, options)
+
+
 def build_record(*, context_options: ContextOptions | None = None) -> CommandRecord:
     entries = recent_entries(1)
     if not entries:
         raise AtuinError("no previous non-copout command found in the current Atuin session")
 
+    entry = entries[0]
     return {
-        **_entry_record(entries[0], context_options),
+        **_entry_record(entry, _git_context(entry, context_options)),
         **_metadata(context_options),
         "scope": "command",
     }
@@ -153,7 +155,13 @@ def build_history_from_entries(
     context_options: ContextOptions | None = None,
 ) -> HistoryRecord:
     """Build a chronological multi-run record from already selected entries."""
-    runs = [_entry_record(entry, context_options) for entry in entries]
+    git_by_cwd: dict[str, context_capture.GitContext | None] = {}
+    runs: list[RunRecord] = []
+    for entry in entries:
+        if entry.cwd not in git_by_cwd:
+            git_by_cwd[entry.cwd] = _git_context(entry, context_options)
+        runs.append(_entry_record(entry, git_by_cwd[entry.cwd]))
+
     return {
         **_metadata(context_options),
         "scope": "history",
