@@ -201,10 +201,9 @@ def recent_history(
     required = set(required_ids)
     entries = [entry for entry in _load_history() if selected(entry)]
     return [
-        entry
-        for index, entry in enumerate(entries)
-        if index < requested or entry.id in required
+        entry for index, entry in enumerate(entries) if index < requested or entry.id in required
     ]
+
 
 def hydrate_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
     """Fetch captured output only for the supplied history entries."""
