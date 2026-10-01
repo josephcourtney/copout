@@ -49,6 +49,12 @@ copout pick 1 3 6       # choose non-contiguous recent commands
 copout pick 2-4 8       # ranges are inclusive
 copout pick --limit 250 # browse farther back in the interactive picker
 copout pick --preselect-records id1,id2 # open with exact Atuin records selected
+copout --no-context     # omit all optional environment/repository context
+copout --git-extended   # add upstream/divergence/remote/changed-file context
+copout --git-diff       # add a bounded working-tree diff
+copout --hostname-context # explicitly include the hostname
+copout --env TERM --env LANG # explicitly include selected environment variables
+copout --resolve git --resolve python # record resolved executable paths
 copout doctor           # detailed integration diagnostics
 copout verify           # concise history + output assertion
 ```
@@ -65,40 +71,78 @@ Copout is presentation-focused. It removes ASCII whitespace only from the end of
 
 For multi-run history records, presented output is bounded to 128 KiB per run and 512 KiB across all runs. Oversized output preserves both its beginning and end with an explicit omission marker. This presentation truncation is separate from Atuin capture truncation: JSON adds `presentation_truncated` and `presentation_omitted_bytes` when Copout shortens an output, while XML adds the same attributes to `<output>`. Bare single-command `copout` output is not subject to this presentation budget.
 
+## Execution context
+
+Schema version 7 can add compact environment and repository context. The defaults are intended to provide useful development context without automatically exposing hostnames, remotes, arbitrary environment variables, or large diffs.
+
+Enabled by default:
+
+- Git repository root, branch/detached state, commit, and dirty state for each run's recorded `cwd` when it is still accessible.
+- Login shell path.
+- OS family and architecture.
+- Atuin session ID.
+- Python executable, version, implementation, and active virtual environment when available.
+
+Disabled by default:
+
+- Hostname.
+- Shell version and OS release/version.
+- Extended Git details: upstream, ahead/behind counts, remote URL, and changed filenames.
+- Git working-tree diff. When enabled, it is bounded to 64 KiB and reports whether it was truncated.
+- Arbitrary environment variables.
+- Explicit executable resolution.
+
+Git context is marked `observed_at_capture="true"`: it describes repository state when Copout creates the record, not necessarily repository state at the historical command's original timestamp. Historical `cwd`, command time, status, and duration continue to come from Atuin.
+
+All extra context can be disabled with `--no-context`. Category overrides include `--no-git-context`, `--no-system-context`, `--no-python-context`, `--hostname-context`, `--shell-version`, `--os-version`, `--git-extended`, and `--git-diff`. `--env NAME` and `--resolve NAME` are repeatable and only expose values explicitly requested.
+
+Copout reads persistent context settings from `$COPOUT_CONFIG` when set, otherwise `$XDG_CONFIG_HOME/copout/config.toml`, otherwise `~/.config/copout/config.toml`. `--config PATH` selects another file. Command-line values override the file; repeated `--env` and `--resolve` values extend configured lists.
+
+```toml
+[context]
+enabled = true
+git = true
+git_extended = false
+git_diff = false
+shell = true
+shell_version = false
+platform = true
+os_version = false
+hostname = false
+session = true
+python = true
+env = []
+executables = []
+```
+
 ## Testing
 
-Run `just check` for lint, formatting, typing, and the test suite. Command tests execute the installed `copout` launcher and module entry point in subprocesses, with a controlled Atuin executable, Jerakeen client, and clipboard helper. They cover selection, normalized output, unavailable output, service errors, diagnostics, and clipboard delivery without modifying your clipboard or history. The inline picker also has headless Textual interaction tests for navigation, multi-selection, confirmation, and cancellation.
+Run `just check` for non-mutating lint, formatting, typing, and the test suite. `just repair` syncs dependencies, applies formatting and safe Ruff fixes, then runs type checking and tests without redundantly rerunning the Ruff validation passes. Add `--unsafe-fixes` to `just repair` or `just lint` to enable Ruff's unsafe fixes.
 
-The real shell capture tests are opt-in. In an Atuin-integrated terminal with output capture enabled, run these as two separate commands:
+Command tests execute the installed `copout` launcher and module entry point in subprocesses, with a controlled Atuin executable, Jerakeen client, and clipboard helper. They cover selection, normalized output, unavailable output, service errors, diagnostics, clipboard delivery, context configuration, and rendering without modifying your clipboard or history. The inline picker also has headless Textual interaction tests for navigation, multi-selection, confirmation, and cancellation.
 
-```console
-printf 'copout-live-probe\n'
-```
+The real shell capture test is self-contained. When `zsh` and `atuin` are available, pytest starts an interactive zsh in a PTY, lets the normal Atuin shell integration initialize, executes a standalone probe, waits across a separate command boundary for Atuin to finalize it, then verifies that Copout can retrieve the captured output. It skips only when the required shell/Atuin executable is unavailable; no manual probe or `COPOUT_LIVE_ATUIN` environment variable is required.
 
-Wait for the next shell prompt. Then run the tests separately in that same terminal (do not paste both commands together):
+## Output format (schema version 7)
 
-```console
-COPOUT_LIVE_ATUIN=1 .venv/bin/pytest -q tests/test_live.py
-```
+Copout's internal record retains capture metadata. JSON exposes that structured record after normalizing `output.text` by removing terminal-end ASCII whitespace. `captured_bytes` is recomputed from the presented text. `observed_bytes` is the upstream count of bytes observed before rendering when the backend supplies it. `total_bytes` is reserved for a true complete-output byte count and is left unknown when the backend cannot supply that fact. Atuin's current command-output RPC reports the size of its stored rendered output rather than the complete pre-truncation output size, so Copout does not map that value to `total_bytes`. Multi-run records may additionally report Copout presentation truncation as described above.
 
-The live output test requires the returned text to be exactly `copout-live-probe`, proving that terminal-end padding has been removed. The second live test exercises normal clipboard delivery and requires clean stderr after Jerakeen/gRPC output retrieval. The ordinary suite skips these tests; passing controlled command tests does not establish that your shell's Atuin capture is configured correctly.
-
-## Output format (schema version 6)
-
-Copout's internal record retains capture metadata. JSON exposes that structured record after normalizing `output.text` by removing terminal-end ASCII whitespace. `captured_bytes` is recomputed from the presented text. `observed_bytes` is the upstream count of bytes observed before rendering when the backend supplies it. `total_bytes` is reserved for a true complete-output byte count and is left unknown when the backend cannot supply that fact. Atuin's current command-output RPC reports the size of its stored rendered output rather than the complete pre-truncation output size, so Copout does not map that value to schema-v6 `total_bytes`. Multi-run records may additionally report Copout presentation truncation as described above.
-
-XML is deliberately smaller. A typical command looks like:
+XML is deliberately compact. A typical command executed inside a Git repository can look like:
 
 ```xml
-<copout version="6">
-  <run status="0" cwd="/tmp" duration_ms="102">
+<copout version="7">
+  <environment login_shell="/bin/zsh" os="darwin" arch="arm64" session_id="...">
+    <python executable="/repo/.venv/bin/python" version="3.14.0" implementation="cpython" environment="/repo/.venv"/>
+  </environment>
+  <run status="0" cwd="/repo" duration_ms="102">
+    <git observed_at_capture="true" root="/repo" branch="main" detached="false" commit="abc123..." dirty="false"/>
     <command><![CDATA[printf 'hello\n']]></command>
     <output><![CDATA[hello]]></output>
   </run>
 </copout>
 ```
 
-History XML has one `<run>` per selected command and does not repeat that count as a root attribute. Run durations are canonical integer milliseconds in `duration_ms`.
+History XML has one `<run>` per selected command and does not repeat that count as a root attribute. Run durations are canonical integer milliseconds in `duration_ms`. Structured optional context uses child elements: extended Git context may add `<changed-file>` and `<diff>`, while explicitly requested environment variables and executable resolutions appear as `<variable>` and `<executable>` children of `<environment>`.
 
 ### Text encoding contract
 
