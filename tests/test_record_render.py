@@ -90,7 +90,8 @@ def test_render_xml_is_compact_semantic_context(monkeypatch) -> None:
         ],
     )
     root = ElementTree.fromstring(render.render(record.build_record()))
-    assert root.attrib == {"version": "7"}
+    assert root.attrib["version"] == "7"
+    assert "captured_at" in root.attrib
     run = root.find("run")
     assert run is not None
     assert run.attrib == {"status": "0", "cwd": "/tmp", "duration_ms": "102"}
@@ -104,7 +105,8 @@ def test_render_xml_is_compact_semantic_context(monkeypatch) -> None:
 def test_history_xml_omits_redundant_selected_attribute() -> None:
     history = record.build_history_from_entries([HistoryEntry("id", "echo hi", output="hi\n")])
     root = ElementTree.fromstring(render.render(history))
-    assert root.attrib == {"version": "7"}
+    assert root.attrib["version"] == "7"
+    assert "captured_at" in root.attrib
     assert len(root.findall("run")) == 1
 
 
@@ -119,6 +121,21 @@ def test_xml_attribute_pretty_printing_is_opt_in(monkeypatch) -> None:
 
     assert '<run status="0" cwd="/tmp" duration_ms="121">' in compact
     assert '<run\n    status="0"\n    cwd="/tmp"\n    duration_ms="121">' in pretty
+
+
+def test_xml_exposes_recorded_at(monkeypatch) -> None:
+    monkeypatch.setattr(
+        record,
+        "recent_entries",
+        lambda count: [
+            HistoryEntry("id", "echo hi", "/tmp", 0, 0.1, "2026-10-01T09:30:00-04:00", "hi\n")
+        ],
+    )
+
+    run = ElementTree.fromstring(render.render(record.build_record())).find("run")
+
+    assert run is not None
+    assert run.attrib["recorded_at"] == "2026-10-01T09:30:00-04:00"
 
 
 def test_xml_round_trips_controls_and_attribute_whitespace(monkeypatch) -> None:
