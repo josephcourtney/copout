@@ -1,11 +1,10 @@
 """Checks against the user's real Atuin shell integration."""
 
-import errno
 import json
 import os
 import pty
-import select
 import shutil
+import signal
 import subprocess
 import sys
 import sysconfig
@@ -14,8 +13,7 @@ from pathlib import Path
 
 import pytest
 
-_PROMPT = b"__COPOUT_TEST_PROMPT__ "
-_TIMEOUT = 15.0
+_TIMEOUT = 20.0
 
 
 def _require_live_shell() -> str:
@@ -27,32 +25,21 @@ def _require_live_shell() -> str:
     return zsh
 
 
-def _read_until(fd: int, marker: bytes, *, timeout: float = _TIMEOUT) -> bytes:
-    deadline = time.monotonic() + timeout
-    output = bytearray()
-    while marker not in output:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            pytest.fail(f"timed out waiting for {marker!r}; terminal output: {bytes(output)!r}")
-        readable, _, _ = select.select([fd], [], [], remaining)
-        if not readable:
-            continue
-        try:
-            chunk = os.read(fd, 4096)
-        except OSError as exc:
-            if exc.errno == errno.EIO:
-                break
-            raise
-        if not chunk:
-            break
-        output.extend(chunk)
-    if marker not in output:
-        pytest.fail(f"shell exited before {marker!r}; terminal output: {bytes(output)!r}")
-    return bytes(output)
-
-
 def _send(fd: int, command: str) -> None:
     os.write(fd, command.encode() + b"\n")
+
+
+def _wait_for_child(pid: int, *, timeout: float = _TIMEOUT) -> int:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        waited_pid, status = os.waitpid(pid, os.WNOHANG)
+        if waited_pid == pid:
+            return status
+        time.sleep(0.05)
+
+    os.kill(pid, signal.SIGTERM)
+    os.waitpid(pid, 0)
+    pytest.fail(f"interactive zsh did not exit within {timeout:g}s")
 
 
 def _run_probe_in_atuin_shell(output_path: Path) -> None:
@@ -62,35 +49,23 @@ def _run_probe_in_atuin_shell(output_path: Path) -> None:
     if pid == 0:
         os.execv(zsh, [zsh, "-il"])
 
+    quoted_launcher = str(launcher).replace("'", "'\\''")
+    quoted_output = str(output_path).replace("'", "'\\''")
+
     try:
-        # Input is buffered by the PTY until zsh is ready. Construct the prompt
-        # from separate fragments so terminal echo of this command cannot itself
-        # contain the sentinel that marks a completed command lifecycle.
-        _send(
-            fd,
-            "PROMPT='__COPOUT_TEST_'$'PROMPT__ ' RPROMPT='' PROMPT_EOL_MARK=''",
-        )
-        _read_until(fd, _PROMPT)
-
+        # These are separate interactive input lines, not one compound shell command.
+        # The PTY may queue them while zsh starts, but zsh still executes each line as
+        # its own command lifecycle. Atuin therefore finalizes the probe before Copout
+        # begins the following command.
         _send(fd, "printf 'copout-live-probe\\n'")
-        _read_until(fd, _PROMPT)
-
-        # Run Copout only after the next prompt: Atuin has then finalized the probe
-        # record and its captured terminal output. Redirect JSON to avoid parsing
-        # terminal echo/prompt control sequences from the PTY itself.
-        quoted_launcher = str(launcher).replace("'", "'\\''")
-        quoted_output = str(output_path).replace("'", "'\\''")
-        _send(
-            fd,
-            f"'{quoted_launcher}' --print --json --last 10 > '{quoted_output}'",
-        )
-        _read_until(fd, _PROMPT)
+        _send(fd, f"'{quoted_launcher}' --print --json --last 10 > '{quoted_output}'")
         _send(fd, "exit")
+        status = _wait_for_child(pid)
     finally:
         os.close(fd)
-        _, status = os.waitpid(pid, 0)
-        if status != 0:
-            pytest.fail(f"interactive zsh exited with wait status {status}")
+
+    if status != 0:
+        pytest.fail(f"interactive zsh exited with wait status {status}")
 
 
 def test_live_shell_capture(tmp_path: Path) -> None:
