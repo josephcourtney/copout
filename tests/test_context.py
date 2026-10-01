@@ -8,8 +8,8 @@ from copout.atuin import HistoryEntry
 from copout.config import ContextOptions, load_context_options
 
 
-def test_context_defaults_are_useful_but_privacy_conservative(tmp_path: Path) -> None:
-    options = load_context_options(tmp_path / "missing.toml") if False else ContextOptions()
+def test_context_defaults_are_useful_but_privacy_conservative() -> None:
+    options = ContextOptions()
 
     assert options.enabled is True
     assert options.git is True
