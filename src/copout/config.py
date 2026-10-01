@@ -52,7 +52,10 @@ _LIST_FIELDS = {"env", "executables"}
 def default_config_path() -> Path:
     if configured := os.environ.get("COPOUT_CONFIG"):
         return Path(configured).expanduser()
-    base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    if xdg_config_home := os.environ.get("XDG_CONFIG_HOME"):
+        base = Path(xdg_config_home)
+    else:
+        base = Path.home() / ".config"
     return base / "copout" / "config.toml"
 
 
