@@ -7,9 +7,10 @@ from copout import cli, record
 runner = CliRunner()
 
 
-def _record_fixture() -> dict:
+def _record_fixture(*, context_options=None) -> dict:
+    del context_options
     return {
-        "version": 6,
+        "version": 7,
         "scope": "command",
         "source": "atuin",
         "history_id": "abc",
@@ -41,6 +42,9 @@ def test_help_is_available_with_short_option() -> None:
     assert "--pretty-attributes" in result.stdout
     assert "--last" in result.stdout
     assert "--failure" in result.stdout
+    assert "--git-context" in result.stdout
+    assert "--system-context" in result.stdout
+    assert "--hostname-context" in result.stdout
     assert "--rendered" not in result.stdout
     assert "--raw" not in result.stdout
 
@@ -57,10 +61,44 @@ def test_pick_help_describes_record_preselection() -> None:
 
     assert result.exit_code == 0
     assert "--preselect-records" in result.stdout
+    assert "--git-context" in result.stdout
+
+
+def test_context_cli_overrides_config_defaults(monkeypatch) -> None:
+    observed = []
+
+    def build_record(*, context_options) -> dict:
+        observed.append(context_options)
+        return _record_fixture()
+
+    monkeypatch.setattr(cli.record, "build_record", build_record)
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "--print",
+            "--no-git-context",
+            "--hostname-context",
+            "--shell-version",
+            "--env",
+            "TERM",
+            "--resolve",
+            "git",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stderr
+    options = observed[0]
+    assert options.git is False
+    assert options.hostname is True
+    assert options.shell_version is True
+    assert options.env == ("TERM",)
+    assert options.executables == ("git",)
 
 
 def test_atuin_failure_goes_to_stderr_and_returns_exit_3(monkeypatch) -> None:
-    def fail() -> dict:
+    def fail(*, context_options=None) -> dict:
+        del context_options
         raise record.AtuinError("history unavailable")
 
     monkeypatch.setattr(cli.record, "build_record", fail)
@@ -89,7 +127,8 @@ def test_clipboard_helper_starts_before_record_build(monkeypatch) -> None:
         events.append("clipboard-start")
         return Writer()
 
-    def build_record() -> dict:
+    def build_record(*, context_options=None) -> dict:
+        del context_options
         events.append("record-build")
         return {}
 
@@ -122,7 +161,8 @@ def test_record_failure_aborts_prestarted_clipboard_helper(monkeypatch) -> None:
         events.append("clipboard-start")
         return Writer()
 
-    def fail() -> dict:
+    def fail(*, context_options=None) -> dict:
+        del context_options
         events.append("record-build")
         raise record.AtuinError("history unavailable")
 
@@ -153,7 +193,7 @@ def test_print_writes_semantic_result_to_stdout(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert result.stderr == ""
-    assert result.stdout.startswith('<copout version="6"')
+    assert result.stdout.startswith('<copout version="7"')
     assert 'source="atuin"' not in result.stdout
     assert "<![CDATA[echo hi]]>" in result.stdout
 
