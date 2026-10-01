@@ -24,7 +24,7 @@ def test_build_record(monkeypatch) -> None:
         ],
     )
     result = record.build_record()
-    assert result["version"] == 6
+    assert result["version"] == 7
     assert result["source"] == "atuin"
     assert result["command"] == "pytest"
     assert result["result"]["status"] == 1
@@ -74,7 +74,7 @@ def test_render_json_uses_semantic_output(monkeypatch) -> None:
     rendered = render.render(record.build_record(), as_json=True)
     payload = json.loads(rendered)
     assert payload["history_id"] == "id1"
-    assert payload["version"] == 6
+    assert payload["version"] == 7
     assert payload["source"] == "atuin"
     assert payload["output"]["text"] == "hi"
     assert payload["output"]["captured_bytes"] == 2
@@ -90,7 +90,7 @@ def test_render_xml_is_compact_semantic_context(monkeypatch) -> None:
         ],
     )
     root = ElementTree.fromstring(render.render(record.build_record()))
-    assert root.attrib == {"version": "6"}
+    assert root.attrib == {"version": "7"}
     run = root.find("run")
     assert run is not None
     assert run.attrib == {"status": "0", "cwd": "/tmp", "duration_ms": "102"}
@@ -104,7 +104,7 @@ def test_render_xml_is_compact_semantic_context(monkeypatch) -> None:
 def test_history_xml_omits_redundant_selected_attribute() -> None:
     history = record.build_history_from_entries([HistoryEntry("id", "echo hi", output="hi\n")])
     root = ElementTree.fromstring(render.render(history))
-    assert root.attrib == {"version": "6"}
+    assert root.attrib == {"version": "7"}
     assert len(root.findall("run")) == 1
 
 
