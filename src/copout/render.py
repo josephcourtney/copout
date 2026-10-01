@@ -5,6 +5,7 @@ import html
 import json
 import re
 
+from .context import EnvironmentContext, GitContext
 from .record import CopoutRecord, OutputRecord, RunRecord
 
 MAX_OUTPUT_BYTES_PER_RUN = 128 * 1024
@@ -137,8 +138,6 @@ def _bound_text(text: str, *, budget: int) -> tuple[str, int]:
     marker = f"\n... [copout omitted {omitted} UTF-8 bytes] ...\n"
     bounded = head + marker + tail
 
-    # The placeholder uses the largest possible byte count, so the actual marker
-    # cannot make the result exceed the requested budget.
     return bounded, omitted
 
 
@@ -199,6 +198,106 @@ def _output_attributes(output: OutputRecord) -> list[str]:
     return attrs
 
 
+def _render_environment(
+    environment: EnvironmentContext,
+    *,
+    pretty_attributes: bool,
+) -> list[str]:
+    scalar_names = (
+        "login_shell",
+        "shell_version",
+        "os",
+        "os_version",
+        "arch",
+        "hostname",
+        "session_id",
+    )
+    attrs = [_attribute(name, environment[name]) for name in scalar_names if name in environment]
+    children: list[str] = []
+
+    if python_context := environment.get("python"):
+        python_attrs = [_attribute(name, value) for name, value in python_context.items()]
+        children.append(
+            _opening_tag(
+                "python",
+                python_attrs,
+                indent="    ",
+                pretty_attributes=pretty_attributes,
+            )[:-1]
+            + "/>"
+        )
+
+    for name, value in environment.get("env", {}).items():
+        children.append(
+            _opening_tag(
+                "variable",
+                [_attribute("name", name), _attribute("value", value)],
+                indent="    ",
+                pretty_attributes=pretty_attributes,
+            )[:-1]
+            + "/>"
+        )
+
+    for name, path in environment.get("executables", {}).items():
+        children.append(
+            _opening_tag(
+                "executable",
+                [_attribute("name", name), _attribute("path", path)],
+                indent="    ",
+                pretty_attributes=pretty_attributes,
+            )[:-1]
+            + "/>"
+        )
+
+    opening = _opening_tag(
+        "environment",
+        attrs,
+        indent="  ",
+        pretty_attributes=pretty_attributes,
+    )
+    if not children:
+        return [opening[:-1] + "/>" ]
+    return [opening, *children, "  </environment>"]
+
+
+def _render_git(git: GitContext, *, indent: str, pretty_attributes: bool) -> list[str]:
+    scalar_names = (
+        "observed_at_capture",
+        "root",
+        "branch",
+        "detached",
+        "commit",
+        "dirty",
+        "upstream",
+        "ahead",
+        "behind",
+        "remote_url",
+        "diff_truncated",
+    )
+    attrs: list[str] = []
+    for name in scalar_names:
+        if name not in git:
+            continue
+        value = git[name]
+        if isinstance(value, bool):
+            value = str(value).lower()
+        attrs.append(_attribute(name, value))
+
+    children = [
+        _element("changed-file", path, indent=f"{indent}  ", pretty_attributes=pretty_attributes)
+        for path in git.get("changed_files", [])
+    ]
+    if "diff" in git:
+        children.append(
+            _element("diff", git["diff"], indent=f"{indent}  ", pretty_attributes=pretty_attributes)
+        )
+
+    opening = _opening_tag("git", attrs, indent=indent, pretty_attributes=pretty_attributes)
+    if not children:
+        return [opening[:-1] + "/>" ]
+    return [opening, *children, f"{indent}</git>"]
+
+
 def _render_run(
     run: RunRecord,
     *,
@@ -223,6 +322,10 @@ def _render_run(
         indent=indent,
         pretty_attributes=pretty_attributes,
     ).splitlines()
+    if git := run["context"].get("git"):
+        lines.extend(
+            _render_git(git, indent=f"{indent}  ", pretty_attributes=pretty_attributes)
+        )
     lines.append(
         _element(
             "command",
@@ -251,17 +354,31 @@ def _fence(text: str, language: str = "") -> str:
 
 
 def _inline_value(value: str) -> str:
-    # JSON quoting keeps newlines and controls from changing Markdown structure.
     quoted = json.dumps(value, ensure_ascii=True)
     longest = max((len(match.group()) for match in re.finditer(r"`+", quoted)), default=0)
     marker = "`" * (longest + 1)
     return f"{marker}{quoted}{marker}"
 
 
+def _markdown_environment(environment: EnvironmentContext) -> list[str]:
+    details: list[str] = []
+    for name in ("os", "arch", "login_shell", "hostname", "session_id"):
+        if value := environment.get(name):
+            details.append(f"{name} {_inline_value(str(value))}")
+    if python_context := environment.get("python"):
+        details.append(f"python {_inline_value(python_context.get('version', ''))}")
+    return details
+
+
 def _render_markdown(record: CopoutRecord) -> str:
     lines: list[str] = []
+    if environment := record.get("environment"):
+        details = _markdown_environment(environment)
+        if details:
+            lines.extend(("### Environment", "", " · ".join(details), ""))
+
     for index, run in enumerate(_record_runs(record), start=1):
-        if lines:
+        if lines and lines[-1] != "":
             lines.append("")
         lines.append(f"### Run {index}" if record["scope"] == "history" else "### Command")
         details: list[str] = []
@@ -271,6 +388,13 @@ def _render_markdown(record: CopoutRecord) -> str:
             details.append(f"cwd {_inline_value(cwd)}")
         if (duration := run["timing"]["duration"]) is not None:
             details.append(f"{_duration_ms(duration)} ms")
+        if git := run["context"].get("git"):
+            if branch := git.get("branch"):
+                details.append(f"git {_inline_value(branch)}")
+            if commit := git.get("commit"):
+                details.append(f"commit {_inline_value(commit[:12])}")
+            if git.get("dirty"):
+                details.append("dirty")
         if details:
             lines.extend(("", " · ".join(details)))
         lines.extend(("", "Command:", "", _fence(run["command"], "console")))
@@ -313,6 +437,8 @@ def render(
             pretty_attributes=pretty_attributes,
         )
     ]
+    if environment := projected.get("environment"):
+        lines.extend(_render_environment(environment, pretty_attributes=pretty_attributes))
     for run in runs:
         lines.extend(
             _render_run(
