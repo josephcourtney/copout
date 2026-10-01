@@ -176,6 +176,11 @@ def _shell_version(shell: str) -> str | None:
     return text.splitlines()[0] if text else None
 
 
+def _platform_name() -> str:
+    system = platform_module.system().lower()
+    return "macos" if system == "darwin" else system
+
+
 def capture_environment(options: ContextOptions) -> EnvironmentContext:
     if not options.enabled:
         return {}
@@ -188,7 +193,7 @@ def capture_environment(options: ContextOptions) -> EnvironmentContext:
             environment["shell_version"] = version
 
     if options.platform:
-        environment["os"] = platform_module.system().lower()
+        environment["os"] = _platform_name()
         environment["arch"] = platform_module.machine()
         if options.os_version:
             environment["os_version"] = platform_module.release()
