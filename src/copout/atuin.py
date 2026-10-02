@@ -239,7 +239,7 @@ def recent_history(
             index for index, entry in enumerate(entries, start=1) if entry.id in required
         ]
         if required_positions:
-            requested = max(requested, max(required_positions))
+            requested = max(requested, *required_positions)
     return entries[:requested]
 
 

@@ -154,8 +154,7 @@ def test_add_outputs_bounds_concurrent_daemon_requests(monkeypatch: pytest.Monke
 
     monkeypatch.setattr(atuin, "connect", lambda **kwargs: FakeConnection())
     entries = [
-        HistoryEntry(str(index), f"cmd {index}")
-        for index in range(atuin._OUTPUT_CONCURRENCY + 5)
+        HistoryEntry(str(index), f"cmd {index}") for index in range(atuin._OUTPUT_CONCURRENCY + 5)
     ]
 
     result = asyncio.run(atuin._add_outputs(entries))
