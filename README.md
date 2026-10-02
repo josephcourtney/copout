@@ -35,41 +35,55 @@ copout verify
 
 ## Use
 
+Copout has two primary selection modes: no explicit selection opens the interactive picker, while positional selectors gather exactly the requested history entries without opening the TUI.
+
 ```console
-copout                  # compact XML for the previous command
-copout -p               # print instead of clipboard
-copout --json           # JSON instead of XML
-copout --markdown       # Markdown with fenced commands and output
-copout pick 1 3 --markdown -p # print selected commands as Markdown
-copout --pretty-attributes # put multiple XML attributes on separate lines
-copout -n 5             # last five commands in the current Atuin session
-copout --failure        # most recent failed command
-copout pick             # inline checklist for recent commands
-copout pick 1 3 6       # choose non-contiguous recent commands
-copout pick 2-4 8       # ranges are inclusive
-copout pick --limit 250 # browse farther back in the interactive picker
-copout pick --preselect-records id1,id2 # open with exact Atuin records selected
-copout --no-context     # omit all optional environment/repository context
-copout --git-extended   # add worktree/upstream/divergence/remote/changed-file context
-copout --git-diff       # add a bounded working-tree diff
-copout --hostname-context # explicitly include the hostname
-copout --env TERM --env LANG # explicitly include selected environment variables
-copout --resolve git --resolve python # record resolved executable paths
-copout doctor           # detailed integration diagnostics
-copout verify           # concise history + output assertion
+copout                         # open the interactive picker
+copout 1                       # latest non-Copout command, noninteractive
+copout 1 3 6                   # gather non-contiguous recent commands
+copout 2-4 8                   # inclusive ranges
+copout 1,4,7                   # comma-separated selectors also work
+copout 1 3-5 9 --markdown      # selectors compose with output options
+copout 2-5 --json -p           # print selected history as JSON
+
+copout -n 5                    # last five commands, noninteractive
+copout --failure               # most recent failed command
+copout -n 3 --failure          # last three failed commands
+
+copout --preselect 1,3         # TUI with relative entries 1 and 3 selected
+copout --preselect 1 --preselect 5-7
+copout --preselect-records id1,id2 # TUI with exact Atuin records selected
+copout --preselect 1-3 --preselect-records id1 # union both preselection forms
+copout --limit 250             # browse farther back in the TUI
+
+copout --markdown              # open TUI; render the chosen result as Markdown
+copout --json                  # open TUI; render the chosen result as JSON
+copout -p                      # open TUI; print instead of copying after confirmation
+copout --pretty-attributes     # open TUI; pretty-print multi-attribute XML elements
+
+copout pick                    # compatibility spelling for the interactive picker
+copout pick 1 3                # compatibility spelling for explicit selectors
+copout doctor                  # detailed integration diagnostics
+copout verify                  # concise history + output assertion
 ```
 
-`copout pick` numbers candidate commands newest-first after excluding Copout commands: `1` is the same command selected by bare `copout`, `2` is the command before that, and so on. Selected runs are emitted chronologically. Explicit selectors are noninteractive. With no selectors, Copout opens a bounded inline checklist over the 100 most recent commands by default. Use Up/Down, Page Up/Page Down, Home/End to move, Space to toggle commands, Enter to copy the accumulated selection, and Esc or `q` to cancel without touching the clipboard. The list scrolls within the inline region rather than printing the entire candidate window into shell history.
+Selectors are 1-based and newest-first after excluding Copout commands: `1` is the newest eligible command, `2` is the one before that, and so on. Selected runs are emitted chronologically. Explicit selectors are always noninteractive and automatically enlarge history discovery far enough to resolve the oldest requested position, so `copout 250` does not require `--limit 250`.
 
-Picker discovery reads only Atuin history metadata. Copout asks the daemon for output only after the selection is known, and then only for the selected commands. The Textual UI is imported only for interactive `copout pick`, so the normal `copout`, `-n`, and explicit `copout pick 1 4 6` paths do not pay its startup cost. Picker drawing is routed to the controlling terminal rather than structured stdout, so `copout pick -p > context.xml` remains usable; `copout pick 1 4 6 -p > context.xml` is fully noninteractive.
+`--limit` controls only the TUI browse window, which defaults to 100 entries. With no explicit selection query, Copout opens a bounded inline checklist. Use Up/Down or `j`/`k` to move one entry, Home/End or `g`/`G` to jump to the ends, Page Up/Page Down or `Ctrl-U`/`Ctrl-D` to move by a page, Space to toggle commands, Enter to copy or print the accumulated selection, and Esc or `q` to cancel without touching the clipboard. The list scrolls within the inline region rather than printing the entire candidate window into shell history.
 
-For shell integrations such as a runbook, `copout pick --preselect-records id1,id2,...` opens the normal picker with those exact Atuin record IDs already selected. The record IDs are the identity boundary: Copout does not try to match command text, and required records are included even when they fall outside the normal picker limit. Unknown IDs are rejected rather than silently ignored. This keeps the integration based on Atuin's existing command records without adding a Copout watcher or command journal.
+`--preselect` uses the same relative selector grammar as noninteractive positional selection, but opens the TUI instead of finalizing the selection. It is repeatable and also accepts comma-separated values. `--preselect-records` addresses exact Atuin record IDs and is intended for integrations that need stable identity rather than a relative history offset. The two preselection forms may be combined and their selections are unioned. Preselection cannot be combined with positional selectors, `-n`, or `--failure`, because those already define a completed noninteractive query.
+
+Formatting, output-delivery, and context options are orthogonal to selection. Options may appear before a root positional selector or after it; for example, `copout --markdown 1 3` and `copout 1 3 --markdown` have the same meaning.
+
+Picker discovery reads only Atuin history metadata. Copout asks the daemon for output only after the selection is known, and then only for the selected commands. The Textual UI is imported only when an interactive picker is actually opened. Picker drawing is routed to the controlling terminal rather than structured stdout, so redirected semantic output remains clean after confirmation. A bare or preselected interactive invocation without a controlling terminal fails explicitly rather than silently changing selection behavior; scripts should use positional selectors, `-n`, or `--failure`.
 
 Copout retrieves persisted chronological history with `atuin history list --session` and retrieves recent captured output from the Atuin daemon through Jerakeen. It does not access Atuin's private database or implement the daemon gRPC protocol itself.
 
-Copout is presentation-focused. It removes ASCII whitespace only from the end of the complete captured output, which eliminates terminal-cell padding and final blank rows while preserving internal indentation, spacing, blank lines, and any SGR styling that survives Atuin's capture. XML is compact by default: routine byte counts and capture metadata are omitted for ordinary complete output. `--pretty-attributes` changes only XML layout, placing multiple attributes on separate indented lines; it does not change the data model.
+## Presentation behavior
 
-For multi-run history records, presented output is bounded to 128 KiB per run and 512 KiB across all runs. Oversized output preserves both its beginning and end with an explicit omission marker. This presentation truncation is separate from Atuin capture truncation: JSON adds `presentation_truncated` and `presentation_omitted_bytes` when Copout shortens an output, while XML adds the same attributes to `<output>`. Bare single-command `copout` output is not subject to this presentation budget.
+Copout removes ASCII whitespace only from the end of complete captured output. This eliminates terminal-cell padding and final blank rows while preserving internal indentation, spacing, blank lines, and any SGR styling that survives Atuin's capture.
+
+For multi-run history records, presented output is bounded to 128 KiB per run and 512 KiB across all runs. Oversized output preserves both its beginning and end with an explicit omission marker. JSON adds `presentation_truncated` and `presentation_omitted_bytes` when Copout shortens an output, while XML adds the same attributes to `<output>`. This presentation truncation is separate from any truncation reported by Atuin. The legacy single-command `CommandRecord` path used by `-n 1` is not subject to the multi-run presentation budget; selector and picker output is represented as selected history and uses the history budget even when only one entry is chosen.
 
 ## Execution context
 
@@ -115,19 +129,11 @@ env = []
 executables = []
 ```
 
-## Testing
-
-Run `just check` for non-mutating lint, formatting, typing, and the test suite. `just repair` syncs dependencies, applies formatting and safe Ruff fixes, then runs type checking and tests without redundantly rerunning the Ruff validation passes. Add `--unsafe-fixes` to `just repair` or `just lint` to enable Ruff's unsafe fixes.
-
-Command tests execute the installed `copout` launcher and module entry point in subprocesses, with a controlled Atuin executable, Jerakeen client, clipboard helper, and isolated config directory. They cover selection, normalized output, unavailable output, service errors, diagnostics, clipboard delivery, context configuration, and rendering without modifying your clipboard or history. The inline picker also has headless Textual interaction tests for navigation, multi-selection, confirmation, and cancellation.
-
-The real shell capture test is self-contained. When `zsh` and `atuin` are available, pytest starts an interactive zsh in a PTY, lets the normal Atuin shell integration initialize, executes a standalone probe, waits across a separate command boundary for Atuin to finalize it, then verifies that Copout can retrieve the captured output. It skips only when the required shell/Atuin executable is unavailable; no manual probe or `COPOUT_LIVE_ATUIN` environment variable is required.
-
 ## Output format (schema version 7)
 
-Copout's internal record retains capture metadata. JSON exposes that structured record after normalizing `output.text` by removing terminal-end ASCII whitespace. `captured_bytes` is recomputed from the presented text. `observed_bytes` is the upstream count of bytes observed before rendering when the backend supplies it. `total_bytes` is reserved for a true complete-output byte count and is left unknown when the backend cannot supply that fact. Atuin's current command-output RPC reports the size of its stored rendered output rather than the complete pre-truncation output size, so Copout does not map that value to `total_bytes`. Multi-run records may additionally report Copout presentation truncation as described above.
+Copout's internal record retains capture metadata. JSON exposes that structured record after normalizing `output.text` by removing terminal-end ASCII whitespace. `captured_bytes` is recomputed from the presented text. `observed_bytes` is the upstream count of bytes observed before rendering when the backend supplies it. `total_bytes` is reserved for a true complete-output byte count and is left unknown when the backend cannot supply that fact. Atuin's current command-output RPC reports the size of its stored rendered output rather than the complete pre-truncation output size, so Copout does not map that value to `total_bytes`.
 
-XML is deliberately compact. A typical command executed inside a Git repository can look like:
+A typical XML history result can look like:
 
 ```xml
 <copout version="7" captured_at="2026-10-01T09:31:00-04:00">
@@ -179,3 +185,11 @@ Atuin's command capture is a terminal-rendered representation. Copout consumes t
 Daemon connection establishment, individual output requests, and status requests each have a three-second deadline. An unavailable or timed-out output request leaves usable history with output marked unavailable. A timed-out status request is reported by `copout doctor` and `copout verify`.
 
 If output retrieval fails, the output record's `error` field (or XML attribute) preserves the reason. `UNIMPLEMENTED` means the daemon does not provide the output RPC expected by the installed Jerakeen client; it is not evidence of a missing capture or a disabled configuration flag. A healthy daemon status alone does not establish output API compatibility. `copout doctor` and `copout verify` report this distinction.
+
+## Testing
+
+Run `just check` for non-mutating lint, formatting, typing, and the test suite. `just repair` syncs dependencies, applies formatting and safe Ruff fixes, then runs type checking and tests without redundantly rerunning the Ruff validation passes. Add `--unsafe-fixes` to `just repair` or `just lint` to enable Ruff's unsafe fixes.
+
+Command tests execute the installed `copout` launcher and module entry point in subprocesses with a controlled Atuin executable, Jerakeen client, clipboard helper, and isolated config directory. They cover root selector dispatch, direct and preselected selection, normalized output, unavailable output, service errors, diagnostics, clipboard delivery, context configuration, rendering, and selector window expansion without modifying the user's clipboard or history. The inline picker has headless Textual interaction tests for arrow and Vim navigation, multi-selection, confirmation, preselection, and cancellation.
+
+The real shell capture test is self-contained. When `zsh` and `atuin` are available, pytest starts an interactive zsh in a PTY, lets the normal Atuin shell integration initialize, executes a standalone probe, waits across a separate command boundary for Atuin to finalize it, then verifies that Copout can retrieve the captured output. It skips only when the required shell/Atuin executable is unavailable.
