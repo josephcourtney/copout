@@ -1,0 +1,3 @@
+- the tui should be the default behavior when `copout` is invoked without arguments
+- invoking `copout #` where '#' is an integer, list of integers, range, etc. should be routed to the behavior currently invoked by `copout -n *args`
+- the tui should accept 'j', 'k', and other applicable vim motion keys
