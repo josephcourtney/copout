@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+
+- Make the interactive picker the default when `copout` is invoked without an explicit selection query; formatting and context options can be supplied before opening the picker.
+- Accept history selectors directly at the root, so `copout 1`, `copout 1 3`, `copout 2-5`, and comma-separated combinations gather exactly those entries without opening the TUI. Explicit selectors automatically extend history discovery far enough to resolve the oldest requested position instead of being limited by the TUI browse window.
+- Add root-level `--preselect` for relative history positions and move `--preselect-records` to the root interface as well; both open the TUI and may be combined, while `copout pick` remains as a compatibility spelling.
+- Expose the TUI browse `--limit` at the root now that bare `copout` opens the picker.
+- Add Vim-style picker navigation: `j`/`k`, `g`/`G`, and `Ctrl-D`/`Ctrl-U`, while retaining the existing arrow, Home/End, and Page Up/Page Down controls.
+
 ## 0.10.0 - 2026-10-01
 
 ### Added
@@ -44,7 +52,7 @@
 - Add typed command/history record schemas and remove defensive renderer shape recovery.
 - Simplify structured output schema to version 3 earlier in the development cycle: redundant `capture` metadata was removed, with provenance represented by top-level `source` and per-run output `source`.
 - Remove the Kitty watcher, Copout state directory, background writer, pending markers, command journal, retention logic, and watcher installation lifecycle.
-- Align policy and contributor documentation around a strictly read-only product boundary: context enrichment may inspect current state but may not modify repositories, shell configuration, Atuin configuration, or external tool configuration.
+- Align policy and contributor documentation around a strictly read-only product boundary: context enrichment may inspect current state but may not modify repositories, shell startup files, Atuin configuration, or external tool configuration.
 
 ### Fixed
 
