@@ -4,23 +4,25 @@
 
 Copout is a small, invocation-driven adapter around Atuin. Atuin remains the source of truth for persisted command history, session identity, and recent PTY-captured output; Jerakeen provides the public Python interface to the Atuin daemon. Copout selects records, optionally enriches them with read-only execution context, renders structured output, and delivers it to stdout or the clipboard.
 
-The 0.10.0 codebase includes:
+The current codebase includes:
 
 - compact XML schema version 7 plus JSON and Markdown renderers;
-- recent-command and arbitrary multi-command selection;
-- stable Atuin record-ID preselection for external integrations;
-- lazy output hydration after picker selection;
+- selector-first CLI UX: bare `copout` opens the interactive picker, while root positional selectors gather exact recent-history positions noninteractively;
+- relative TUI preselection through `--preselect` and stable Atuin record-ID preselection through `--preselect-records`;
+- bounded Textual selection with arrow and Vim-style navigation;
+- recent-command and arbitrary multi-command selection, with explicit selectors independent of the TUI browse-window limit;
+- lazy output hydration after picker or selector resolution;
 - configurable, privacy-conservative execution-context capture;
 - read-only diagnostics and end-to-end verification;
 - bounded presentation of large multi-run output;
 - self-contained real-shell/Atuin PTY integration tests;
 - local repair/check workflows through `just`.
 
-## 0.10.0 release tranche
+## Next release tranche
 
-1. Keep package/version metadata, lockfile, changelog, README, policy, contributor guidance, and schema documentation synchronized.
-2. Regenerate the lockfile after the 0.10.0 version bump.
-3. Run `just repair`, then a final non-mutating `just check`.
+1. Validate selector-first dispatch, relative/stable preselection, picker navigation, and legacy `pick` compatibility with `just repair` and `just check`.
+2. Exercise the new bare-picker UX in a real terminal, including redirected `-p` output and non-TTY failure behavior.
+3. Keep package/version metadata, lockfile, changelog, README, policy, contributor guidance, and schema documentation synchronized before a release bump.
 4. Do not add release automation, CI, or publication machinery merely for this release; tag/publish only when explicitly requested.
 
 ## Post-release stabilization
