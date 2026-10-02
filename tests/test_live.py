@@ -152,7 +152,7 @@ def test_live_clipboard_delivery_does_not_fork_after_grpc(tmp_path: Path) -> Non
     env = dict(os.environ)
     env["PATH"] = os.pathsep.join((str(tmp_path), env.get("PATH", "")))
     result = subprocess.run(
-        [str(launcher)],
+        [str(launcher), "1"],
         env=env,
         capture_output=True,
         text=True,
