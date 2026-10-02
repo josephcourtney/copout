@@ -1,22 +1,64 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated
 
 import typer
+from typer.core import TyperGroup
 
 from . import atuin, clipboard, doctor, record, render, selection
 from .config import ConfigError, ContextOptions, load_context_options
 
+
+class SelectorGroup(TyperGroup):
+    """Route selector-shaped command tokens to the picker command."""
+
+    def resolve_command(self, ctx, args):
+        if args and selection.looks_like_selector(args[0]):
+            args = ["pick", *args]
+        return super().resolve_command(ctx, args)
+
+
 app = typer.Typer(
+    cls=SelectorGroup,
     add_completion=False,
     context_settings={"help_option_names": ["-h", "--help"]},
-    help="Copy recent structured terminal history from Atuin to the clipboard.",
+    help=(
+        "Copy recent structured terminal history from Atuin to the clipboard. "
+        "With no selection, open the interactive picker; positional selectors such as "
+        "`1 3 5-7` select entries directly."
+    ),
     invoke_without_command=True,
     no_args_is_help=False,
     rich_markup_mode=None,
 )
+
+
+@dataclass(slots=True)
+class _RootOptions:
+    print_output: bool = False
+    as_json: bool = False
+    as_markdown: bool = False
+    pretty_attributes: bool = False
+    last: int | None = None
+    failure: bool = False
+    limit: int | None = None
+    preselect: list[str] = field(default_factory=list)
+    preselect_records: list[str] = field(default_factory=list)
+    config_path: Path | None = None
+    context_enabled: bool | None = None
+    git_context: bool | None = None
+    git_extended: bool | None = None
+    git_diff: bool | None = None
+    system_context: bool | None = None
+    hostname_context: bool | None = None
+    shell_version: bool | None = None
+    os_version: bool | None = None
+    python_context: bool | None = None
+    env_vars: list[str] = field(default_factory=list)
+    executables: list[str] = field(default_factory=list)
 
 
 def _start_writer(*, print_output: bool) -> tuple[clipboard.ClipboardWriter | None, int | None]:
@@ -154,6 +196,7 @@ def _pick_entries(
 def run_pick(
     *,
     selectors: list[str],
+    preselect: list[str],
     preselect_records: list[str],
     limit: int,
     print_output: bool,
@@ -164,33 +207,39 @@ def run_pick(
 ) -> int:
     try:
         record_ids = selection.parse_record_ids(preselect_records) if preselect_records else []
-        if selectors and record_ids:
+        if selectors and (preselect or record_ids):
             raise selection.SelectionError(
-                "command selectors and --preselect-records cannot be combined"
+                "explicit selectors cannot be combined with --preselect or --preselect-records"
             )
-        candidates = (
-            atuin.recent_history(limit, required_ids=record_ids)
-            if record_ids
-            else atuin.recent_history(limit)
-        )
-    except selection.SelectionError as exc:
-        print(f"copout: {exc}", file=sys.stderr)
-        return 2
-    except record.AtuinError as exc:
-        return _report_atuin_error(exc)
 
-    try:
+        if selectors:
+            candidate_limit = selection.selector_extent(selectors)
+        else:
+            candidate_limit = limit
+            if preselect:
+                candidate_limit = max(candidate_limit, selection.selector_extent(preselect))
+
+        candidates = atuin.recent_history(candidate_limit, required_ids=record_ids)
+        if record_ids:
+            selection.select_entries_by_ids(candidates, record_ids)
+
+        preselected_ids = list(record_ids)
+        if preselect:
+            for entry in selection.select_entries(candidates, preselect):
+                if entry.id not in preselected_ids:
+                    preselected_ids.append(entry.id)
+
         if selectors:
             selected = selection.select_entries(candidates, selectors)
         else:
-            if record_ids:
-                selection.select_entries_by_ids(candidates, record_ids)
-            selected = _pick_entries(candidates, preselected_ids=record_ids)
+            selected = _pick_entries(candidates, preselected_ids=preselected_ids)
             if selected is None:
                 return 0
     except selection.SelectionError as exc:
         print(f"copout: {exc}", file=sys.stderr)
         return 2
+    except record.AtuinError as exc:
+        return _report_atuin_error(exc)
 
     writer, error_code = _start_writer(print_output=print_output)
     if error_code is not None:
@@ -214,6 +263,48 @@ def run_pick(
             writer.abort()
 
 
+def _root_options(ctx: typer.Context) -> _RootOptions:
+    if ctx.parent is not None and isinstance(ctx.parent.obj, _RootOptions):
+        return ctx.parent.obj
+    return _RootOptions()
+
+
+def _prefer[T](local: T | None, inherited: T | None) -> T | None:
+    return local if local is not None else inherited
+
+
+def _merged_context_options(
+    inherited: _RootOptions,
+    *,
+    config_path: Path | None,
+    context_enabled: bool | None,
+    git_context: bool | None,
+    git_extended: bool | None,
+    git_diff: bool | None,
+    system_context: bool | None,
+    hostname_context: bool | None,
+    shell_version: bool | None,
+    os_version: bool | None,
+    python_context: bool | None,
+    env_vars: list[str],
+    executables: list[str],
+) -> ContextOptions:
+    return _context_options(
+        config_path=_prefer(config_path, inherited.config_path),
+        context_enabled=_prefer(context_enabled, inherited.context_enabled),
+        git_context=_prefer(git_context, inherited.git_context),
+        git_extended=_prefer(git_extended, inherited.git_extended),
+        git_diff=_prefer(git_diff, inherited.git_diff),
+        system_context=_prefer(system_context, inherited.system_context),
+        hostname_context=_prefer(hostname_context, inherited.hostname_context),
+        shell_version=_prefer(shell_version, inherited.shell_version),
+        os_version=_prefer(os_version, inherited.os_version),
+        python_context=_prefer(python_context, inherited.python_context),
+        env_vars=[*inherited.env_vars, *env_vars],
+        executables=[*inherited.executables, *executables],
+    )
+
+
 @app.callback()
 def cli(
     ctx: typer.Context,
@@ -232,12 +323,38 @@ def cli(
         ),
     ] = False,
     last: Annotated[
-        int, typer.Option("--last", "-n", min=1, help="Include the last N commands.")
-    ] = 1,
+        int | None,
+        typer.Option("--last", "-n", min=1, help="Include the last N commands without the TUI."),
+    ] = None,
     failure: Annotated[
         bool,
-        typer.Option("--failure", help="Select the most recent failed command."),
+        typer.Option("--failure", help="Select failed commands; defaults to the most recent one."),
     ] = False,
+    limit: Annotated[
+        int | None,
+        typer.Option(
+            "--limit",
+            "-l",
+            min=1,
+            help="Number of recent commands shown by the TUI (default: 100).",
+        ),
+    ] = None,
+    preselect: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--preselect",
+            help=(
+                "Open the TUI with these relative history selectors selected; repeat or use commas."
+            ),
+        ),
+    ] = None,
+    preselect_records: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--preselect-records",
+            help="Open the TUI with these Atuin record IDs selected; values may be comma-separated.",
+        ),
+    ] = None,
     config_path: Annotated[
         Path | None,
         typer.Option("--config", help="Read context settings from this TOML file."),
@@ -301,10 +418,37 @@ def cli(
     ] = None,
 ) -> None:
     """Copy recent Atuin command history and captured output."""
+    root = _RootOptions(
+        print_output=print_output,
+        as_json=as_json,
+        as_markdown=as_markdown,
+        pretty_attributes=pretty_attributes,
+        last=last,
+        failure=failure,
+        limit=limit,
+        preselect=preselect or [],
+        preselect_records=preselect_records or [],
+        config_path=config_path,
+        context_enabled=context_enabled,
+        git_context=git_context,
+        git_extended=git_extended,
+        git_diff=git_diff,
+        system_context=system_context,
+        hostname_context=hostname_context,
+        shell_version=shell_version,
+        os_version=os_version,
+        python_context=python_context,
+        env_vars=env_vars or [],
+        executables=executables or [],
+    )
+    ctx.obj = root
     if ctx.invoked_subcommand is not None:
         return
     if as_json and as_markdown:
         raise typer.BadParameter("--json and --markdown cannot be combined")
+    if (preselect or preselect_records) and (last is not None or failure):
+        raise typer.BadParameter("TUI preselection cannot be combined with --last or --failure")
+
     options = _context_options(
         config_path=config_path,
         context_enabled=context_enabled,
@@ -319,14 +463,30 @@ def cli(
         env_vars=env_vars or [],
         executables=executables or [],
     )
+
+    if last is not None or failure:
+        raise typer.Exit(
+            run(
+                print_output=print_output,
+                as_json=as_json,
+                as_markdown=as_markdown,
+                pretty_attributes=pretty_attributes,
+                count=last or 1,
+                failure=failure,
+                context_options=options,
+            )
+        )
+
     raise typer.Exit(
-        run(
+        run_pick(
+            selectors=[],
+            preselect=preselect or [],
+            preselect_records=preselect_records or [],
+            limit=limit or selection.DEFAULT_PICK_LIMIT,
             print_output=print_output,
             as_json=as_json,
             as_markdown=as_markdown,
             pretty_attributes=pretty_attributes,
-            count=last,
-            failure=failure,
             context_options=options,
         )
     )
@@ -334,9 +494,19 @@ def cli(
 
 @app.command("pick")
 def pick_command(
+    ctx: typer.Context,
     selectors: Annotated[
         list[str] | None,
         typer.Argument(help="Recent command numbers or ranges, for example: 1 3 5-7."),
+    ] = None,
+    preselect: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--preselect",
+            help=(
+                "Open the picker with these relative history selectors selected; repeat or use commas."
+            ),
+        ),
     ] = None,
     preselect_records: Annotated[
         list[str] | None,
@@ -346,9 +516,14 @@ def pick_command(
         ),
     ] = None,
     limit: Annotated[
-        int,
-        typer.Option("--limit", "-l", min=1, help="Number of recent commands available to pick."),
-    ] = selection.DEFAULT_PICK_LIMIT,
+        int | None,
+        typer.Option(
+            "--limit",
+            "-l",
+            min=1,
+            help="Number of recent commands available in the picker (default: 100).",
+        ),
+    ] = None,
     print_output: Annotated[
         bool, typer.Option("--print", "-p", help="Print instead of copying.")
     ] = False,
@@ -425,10 +600,19 @@ def pick_command(
         ),
     ] = None,
 ) -> None:
-    """Choose arbitrary recent commands and copy them as one history record."""
-    if as_json and as_markdown:
+    """Choose arbitrary recent commands; retained as an explicit compatibility spelling."""
+    inherited = _root_options(ctx)
+    merged_json = as_json or inherited.as_json
+    merged_markdown = as_markdown or inherited.as_markdown
+    if merged_json and merged_markdown:
         raise typer.BadParameter("--json and --markdown cannot be combined")
-    options = _context_options(
+    if inherited.last is not None or inherited.failure:
+        raise typer.BadParameter("positional/TUI selection cannot be combined with --last or --failure")
+
+    merged_preselect = [*inherited.preselect, *(preselect or [])]
+    merged_preselect_records = [*inherited.preselect_records, *(preselect_records or [])]
+    options = _merged_context_options(
+        inherited,
         config_path=config_path,
         context_enabled=context_enabled,
         git_context=git_context,
@@ -445,12 +629,13 @@ def pick_command(
     raise typer.Exit(
         run_pick(
             selectors=selectors or [],
-            preselect_records=preselect_records or [],
-            limit=limit,
-            print_output=print_output,
-            as_json=as_json,
-            as_markdown=as_markdown,
-            pretty_attributes=pretty_attributes,
+            preselect=merged_preselect,
+            preselect_records=merged_preselect_records,
+            limit=limit or inherited.limit or selection.DEFAULT_PICK_LIMIT,
+            print_output=print_output or inherited.print_output,
+            as_json=merged_json,
+            as_markdown=merged_markdown,
+            pretty_attributes=pretty_attributes or inherited.pretty_attributes,
             context_options=options,
         )
     )
