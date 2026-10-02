@@ -82,13 +82,23 @@ def test_picker_preselects_records_by_id() -> None:
     asyncio.run(exercise())
 
 
-def test_picker_enter_requires_at_least_one_selection() -> None:
+def test_picker_enter_without_selection_defaults_to_latest_command() -> None:
     async def exercise() -> None:
-        app = picker.CommandPicker([HistoryEntry("1", "only command")])
+        app = picker.CommandPicker(
+            [
+                HistoryEntry("3", "newest"),
+                HistoryEntry("2", "middle"),
+                HistoryEntry("1", "oldest"),
+            ]
+        )
         async with app.run_test(size=(80, 12)) as pilot:
+            choices = app.query_one("#commands", SelectionList)
+            assert choices.selected == []
+            assert "Enter copies latest" in str(app.query_one("#picker-help", Static).render())
+
+            await pilot.press("down", "down")
+            assert choices.highlighted == 2
             await pilot.press("enter")
-            assert app.return_value is None
-            await pilot.press("space", "enter")
 
         assert app.return_value == [0]
 
