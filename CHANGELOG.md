@@ -5,6 +5,7 @@
 ### Changed
 
 - Make the interactive picker the default when `copout` is invoked without an explicit selection query; formatting and context options can be supplied before opening the picker.
+- When the interactive picker has no selected entries, pressing Enter now captures the most recent eligible command (history position `1`) instead of requiring an explicit selection.
 - Accept history selectors directly at the root, so `copout 1`, `copout 1 3`, `copout 2-5`, and comma-separated combinations gather exactly those entries without opening the TUI. Explicit selectors automatically extend history discovery far enough to resolve the oldest requested position instead of being limited by the TUI browse window.
 - Add root-level `--preselect` for relative history positions and move `--preselect-records` to the root interface as well; both open the TUI and may be combined, while `copout pick` remains as a compatibility spelling.
 - Expose the TUI browse `--limit` at the root now that bare `copout` opens the picker.
