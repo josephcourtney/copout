@@ -91,6 +91,12 @@ def _run_probe_in_atuin_shell(output_path: Path) -> None:
     launcher = Path(sysconfig.get_path("scripts")) / "copout"
     pid, fd = pty.fork()
     if pid == 0:
+        # pytest may itself be running under Atuin's pty-proxy. The PTY created
+        # above is a new terminal boundary, so inherited proxy markers would
+        # incorrectly tell the child shell that this new PTY is already proxied.
+        # Let the child's normal shell startup launch its own proxy instead.
+        os.environ.pop("ATUIN_PTY_PROXY_ACTIVE", None)
+        os.environ.pop("ATUIN_PTY_PROXY_SOCKET", None)
         os.execv(zsh, [zsh, "-il"])
 
     quoted_launcher = str(launcher).replace("'", "'\\''")
