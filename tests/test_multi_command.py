@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from xml.etree import ElementTree
 
+import pytest
 from typer.testing import CliRunner
 
 from copout import atuin, cli, record, render
@@ -24,13 +25,13 @@ def test_recent_history_does_not_fetch_output(monkeypatch) -> None:
     assert atuin.recent_history(20) == [entry]
 
 
-def test_recent_history_includes_required_records_beyond_limit(monkeypatch) -> None:
+def test_recent_history_extends_contiguously_to_required_records(monkeypatch) -> None:
     entries = [HistoryEntry(str(index), f"cmd {index}") for index in range(5, 0, -1)]
     monkeypatch.setattr(atuin, "_load_history", lambda: entries)
 
     result = atuin.recent_history(2, required_ids=["1"])
 
-    assert [entry.id for entry in result] == ["5", "4", "1"]
+    assert [entry.id for entry in result] == ["5", "4", "3", "2", "1"]
 
 
 def test_hydrate_outputs_fetches_only_supplied_entries(monkeypatch) -> None:
@@ -45,6 +46,24 @@ def test_hydrate_outputs_fetches_only_supplied_entries(monkeypatch) -> None:
 
     assert atuin.hydrate_outputs(entries) == entries
     assert calls == ["3", "1"]
+
+
+def test_build_history_rejects_empty_matches(monkeypatch) -> None:
+    monkeypatch.setattr(record, "recent_entries", lambda count, *, failed_only=False: [])
+
+    with pytest.raises(record.AtuinError, match="no non-copout commands"):
+        record.build_history(count=3)
+    with pytest.raises(record.AtuinError, match="no failed non-copout commands"):
+        record.build_history(count=1, failed_only=True)
+
+
+def test_failure_query_reports_no_matches(monkeypatch) -> None:
+    monkeypatch.setattr(record, "recent_entries", lambda count, *, failed_only=False: [])
+
+    result = runner.invoke(cli.app, ["--failure", "--print"])
+
+    assert result.exit_code == 3
+    assert "no failed non-copout commands found" in result.stderr
 
 
 def test_pick_explicit_selectors_are_noninteractive(monkeypatch) -> None:

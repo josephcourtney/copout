@@ -10,6 +10,14 @@
 - Add root-level `--preselect` for relative history positions and move `--preselect-records` to the root interface as well; both open the TUI and may be combined, while `copout pick` remains as a compatibility spelling.
 - Expose the TUI browse `--limit` at the root now that bare `copout` opens the picker.
 - Add Vim-style picker navigation: `j`/`k`, `g`/`G`, and `Ctrl-D`/`Ctrl-U`, while retaining the existing arrow, Home/End, and Page Up/Page Down controls.
+- Extend stable record-ID preselection contiguously through the oldest required entry so picker numbering remains the true relative history position even beyond the normal browse limit.
+- Bound concurrent Atuin output hydration requests to avoid large explicit selections producing unbounded daemon RPC bursts.
+
+### Fixed
+
+- Report an error instead of emitting a successful empty history record when `--failure` or another history-count query has no matching commands.
+- Filter Copout's supported module and wrapper invocation forms (`python -m copout.cli`, `uv run python -m copout.cli`, `uvx copout`, and `command copout`) out of candidate history as well as direct `copout` invocations.
+- Add regression coverage for config-path precedence and CLI overrides over configured context settings.
 
 ## 0.10.0 - 2026-10-01
 

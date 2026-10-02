@@ -184,6 +184,9 @@ def build_history(
     context_options: ContextOptions | None = None,
 ) -> HistoryRecord:
     entries = recent_entries(count, failed_only=failed_only)
+    if not entries:
+        qualifier = "failed " if failed_only else ""
+        raise AtuinError(f"no {qualifier}non-copout commands found in the current Atuin session")
     entries.reverse()
     return build_history_from_entries(
         entries,

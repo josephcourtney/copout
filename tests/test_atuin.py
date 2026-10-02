@@ -125,6 +125,44 @@ def test_add_outputs_uses_protocol3_history_service(monkeypatch: pytest.MonkeyPa
     ]
 
 
+def test_add_outputs_bounds_concurrent_daemon_requests(monkeypatch: pytest.MonkeyPatch) -> None:
+    active = 0
+    maximum_active = 0
+
+    class FakeHistory:
+        async def output(self, history_id: str):
+            nonlocal active, maximum_active
+            active += 1
+            maximum_active = max(maximum_active, active)
+            await asyncio.sleep(0.01)
+            active -= 1
+            return SimpleNamespace(
+                text=f"{history_id}\n",
+                truncated=False,
+                observed_bytes=len(history_id) + 1,
+            )
+
+    class FakeAtuin:
+        history = FakeHistory()
+
+    class FakeConnection:
+        async def __aenter__(self):
+            return FakeAtuin()
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+    monkeypatch.setattr(atuin, "connect", lambda **kwargs: FakeConnection())
+    entries = [
+        HistoryEntry(str(index), f"cmd {index}") for index in range(atuin._OUTPUT_CONCURRENCY + 5)
+    ]
+
+    result = asyncio.run(atuin._add_outputs(entries))
+
+    assert [entry.output for entry in result] == [f"{entry.id}\n" for entry in entries]
+    assert maximum_active == atuin._OUTPUT_CONCURRENCY
+
+
 def test_recent_entries_filters_copout_preserves_order_and_fetches_output(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -168,9 +206,15 @@ def test_recent_entries_failed_only_filters_before_limit(monkeypatch: pytest.Mon
     [
         ("copout -p", True),
         ("/usr/local/bin/copout pick 1", True),
+        ("command copout --json 1", True),
         ("uv run copout --print", True),
         ("uv run -- copout pick", True),
+        ("uvx copout 1", True),
+        ("python -m copout.cli --print 1", True),
+        ("python3.14 -m copout.cli --json 1", True),
+        ("uv run python -m copout.cli 1", True),
         ("uv run other copout", False),
+        ("python -m other copout", False),
         ("echo copout", False),
     ],
 )
