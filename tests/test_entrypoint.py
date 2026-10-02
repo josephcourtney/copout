@@ -164,19 +164,19 @@ def command_env(tmp_path: Path) -> CommandEnvironment:
 
 @pytest.mark.parametrize("module", [False, True])
 def test_command_prints_captured_output(command_env: CommandEnvironment, module: bool) -> None:
-    result = command_env.run("--print", "--json", module=module)
+    result = command_env.run("1", "--print", "--json", module=module)
     assert result.returncode == 0, result.stderr
     assert result.stderr == ""
     payload = json.loads(result.stdout)
-    assert payload["history_id"] == "new"
-    assert payload["output"]["text"] == "héllo"
-    assert payload["output"]["state"] == "captured"
-    assert payload["timing"]["duration"] == pytest.approx(0.071)
+    assert [run["history_id"] for run in payload["runs"]] == ["new"]
+    assert payload["runs"][0]["output"]["text"] == "héllo"
+    assert payload["runs"][0]["output"]["state"] == "captured"
+    assert payload["runs"][0]["timing"]["duration"] == pytest.approx(0.071)
     assert not command_env.clipboard.exists()
 
 
 def test_command_copies_to_helper(command_env: CommandEnvironment) -> None:
-    result = command_env.run()
+    result = command_env.run("1")
     assert result.returncode == 0, result.stderr
     assert result.stdout == result.stderr == ""
     copied = command_env.clipboard.read_text()
@@ -188,7 +188,7 @@ def test_command_copies_to_helper(command_env: CommandEnvironment) -> None:
 
 def test_output_removes_terminal_end_padding(command_env: CommandEnvironment) -> None:
     command_env.env["OUTPUTS"] = json.dumps({"new": "hello\n       \t"})
-    result = command_env.run("--print")
+    result = command_env.run("1", "--print")
     assert result.returncode == 0, result.stderr
     output = ElementTree.fromstring(result.stdout).find("run/output")
     assert output is not None
@@ -212,6 +212,13 @@ def test_command_selects_and_orders_history(command_env: CommandEnvironment, fai
         assert payload["runs"][0]["output"]["text"] == ""
 
 
+def test_root_selector_range_is_noninteractive(command_env: CommandEnvironment) -> None:
+    result = command_env.run("1", "3", "--print", "--json")
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert [row["history_id"] for row in payload["runs"]] == ["old", "new"]
+
+
 @pytest.mark.parametrize("scenario", ["missing", "DAEMON_ERROR", "OUTPUT_ERROR"])
 def test_command_preserves_history_without_output(
     command_env: CommandEnvironment, scenario: str
@@ -220,26 +227,26 @@ def test_command_preserves_history_without_output(
         command_env.env["OUTPUTS"] = "{}"
     else:
         command_env.env[scenario] = "1"
-    result = command_env.run("--print", "--json")
+    result = command_env.run("1", "--print", "--json")
     assert result.returncode == 0, result.stderr
     assert result.stderr == ""
     payload = json.loads(result.stdout)
-    assert payload["history_id"] == "new"
-    assert payload["output"]["state"] == "unavailable"
+    assert payload["runs"][0]["history_id"] == "new"
+    assert payload["runs"][0]["output"]["state"] == "unavailable"
 
 
 @pytest.mark.parametrize(
-    ("scenario", "message"),
+    ("scenario", "message", "status"),
     [
-        ("HISTORY_ERROR", "history unavailable"),
-        ("MALFORMED_HISTORY", "unrecognized format"),
-        ("empty", "no previous non-copout command"),
-        ("session", "ATUIN_SESSION is not set"),
-        ("atuin", "not on PATH"),
+        ("HISTORY_ERROR", "history unavailable", 3),
+        ("MALFORMED_HISTORY", "unrecognized format", 3),
+        ("empty", "no recent commands are available", 2),
+        ("session", "ATUIN_SESSION is not set", 3),
+        ("atuin", "not on PATH", 3),
     ],
 )
 def test_command_reports_history_failures(
-    command_env: CommandEnvironment, scenario: str, message: str
+    command_env: CommandEnvironment, scenario: str, message: str, status: int
 ) -> None:
     if scenario == "empty":
         command_env.env["HISTORY_ROWS"] = "[]"
@@ -249,8 +256,8 @@ def test_command_reports_history_failures(
         (command_env.bin_dir / "atuin").unlink()
     else:
         command_env.env[scenario] = "1"
-    result = command_env.run("--print")
-    assert result.returncode == 3
+    result = command_env.run("1", "--print")
+    assert result.returncode == status
     assert result.stdout == ""
     assert message in result.stderr
     assert "Traceback" not in result.stderr
@@ -262,7 +269,7 @@ def test_command_reports_clipboard_failure(command_env: CommandEnvironment, miss
         (command_env.bin_dir / "pbcopy").unlink()
     else:
         command_env.env["CLIPBOARD_STATUS"] = "7"
-    result = command_env.run()
+    result = command_env.run("1")
     assert result.returncode == (127 if missing else 7)
     assert "clipboard helper" in result.stderr
 
@@ -274,6 +281,7 @@ def test_command_help_needs_no_services(command_env: CommandEnvironment, flag: s
     result = command_env.run(flag)
     assert result.returncode == 0, result.stderr
     assert "--print" in result.stdout
+    assert "--preselect" in result.stdout
     assert "--pretty-attributes" in result.stdout
     assert "--rendered" not in result.stdout
     assert "--raw" not in result.stdout
@@ -296,9 +304,9 @@ def test_command_diagnostics(
 def test_stalled_daemon_requests_terminate(command_env: CommandEnvironment, scenario: str) -> None:
     command_env.env[scenario] = "1"
     if scenario == "OUTPUT_STALL":
-        result = command_env.run("--print", "--json")
+        result = command_env.run("1", "--print", "--json")
         assert result.returncode == 0, result.stderr
-        assert json.loads(result.stdout)["output"]["state"] == "unavailable"
+        assert json.loads(result.stdout)["runs"][0]["output"]["state"] == "unavailable"
     else:
         result = command_env.run("doctor")
         assert result.returncode == 5
@@ -309,10 +317,10 @@ def test_stalled_daemon_requests_terminate(command_env: CommandEnvironment, scen
 @pytest.mark.parametrize("as_json", [False, True])
 def test_truncated_output_metadata(command_env: CommandEnvironment, as_json: bool) -> None:
     command_env.env.update(TRUNCATED="1", OBSERVED_BYTES="10000")
-    result = command_env.run("--print", *(["--json"] if as_json else []))
+    result = command_env.run("1", "--print", *(["--json"] if as_json else []))
     assert result.returncode == 0, result.stderr
     if as_json:
-        output = json.loads(result.stdout)["output"]
+        output = json.loads(result.stdout)["runs"][0]["output"]
         assert output["truncated"] is True
         assert output["observed_bytes"] == 10000
         assert output["total_bytes"] is None
@@ -332,7 +340,7 @@ def test_xml_keeps_ansi_but_trims_terminal_end_whitespace(
 ) -> None:
     original = "\x1b[31mred\x1b[0m\r\n"
     command_env.env["OUTPUTS"] = json.dumps({"new": original})
-    result = command_env.run("--print")
+    result = command_env.run("1", "--print")
     assert result.returncode == 0, result.stderr
     output = ElementTree.fromstring(result.stdout).find("run/output")
     assert output is not None
@@ -345,13 +353,13 @@ def test_unsupported_output_rpc_is_reported(
     command_env: CommandEnvironment, subcommand: str
 ) -> None:
     command_env.env["OUTPUT_UNSUPPORTED"] = "1"
-    args = ("--print", "--json") if subcommand == "print" else (subcommand,)
+    args = ("1", "--print", "--json") if subcommand == "print" else (subcommand,)
     result = command_env.run(*args)
     assert result.returncode == {"doctor": 5, "verify": 1, "print": 0}[subcommand]
     assert result.stderr == ""
     assert "UNIMPLEMENTED" in result.stdout
     assert "does not implement" in result.stdout
     if subcommand == "print":
-        output = json.loads(result.stdout)["output"]
+        output = json.loads(result.stdout)["runs"][0]["output"]
         assert output["state"] == "unavailable"
         assert "UNIMPLEMENTED" in output["error"]

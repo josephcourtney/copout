@@ -49,6 +49,12 @@ class CommandPicker(App[list[int] | None]):
         Binding("escape", "cancel", "Cancel", priority=True),
         Binding("q", "cancel", "Cancel", priority=True),
         Binding("ctrl+c", "cancel", "Cancel", show=False, priority=True),
+        Binding("j", "cursor_down", "Down", show=False, priority=True),
+        Binding("k", "cursor_up", "Up", show=False, priority=True),
+        Binding("g", "first", "First", show=False, priority=True),
+        Binding("shift+g", "last", "Last", show=False, priority=True),
+        Binding("ctrl+d", "page_down", "Page down", show=False, priority=True),
+        Binding("ctrl+u", "page_up", "Page up", show=False, priority=True),
     ]
 
     def __init__(
@@ -83,14 +89,35 @@ class CommandPicker(App[list[int] | None]):
 
     @staticmethod
     def _help_text(selected: int) -> str:
-        return f"{selected} selected  ↑↓ navigate  Space toggle  Enter copy  Esc/q cancel"
+        return f"{selected} selected  ↑↓/jk navigate  Space toggle  Enter copy  Esc/q cancel"
+
+    def _choices(self) -> SelectionList:
+        return self.query_one("#commands", SelectionList)
+
+    def action_cursor_down(self) -> None:
+        self._choices().action_cursor_down()
+
+    def action_cursor_up(self) -> None:
+        self._choices().action_cursor_up()
+
+    def action_first(self) -> None:
+        self._choices().action_first()
+
+    def action_last(self) -> None:
+        self._choices().action_last()
+
+    def action_page_down(self) -> None:
+        self._choices().action_page_down()
+
+    def action_page_up(self) -> None:
+        self._choices().action_page_up()
 
     def action_confirm(self) -> None:
-        choices = self.query_one("#commands", SelectionList)
+        choices = self._choices()
         selected = [int(value) for value in choices.selected]
         if not selected:
             self.query_one("#picker-help", Static).update(
-                "Select at least one command  ↑↓ navigate  Space toggle  Esc/q cancel"
+                "Select at least one command  ↑↓/jk navigate  Space toggle  Esc/q cancel"
             )
             self.bell()
             return

@@ -21,6 +21,20 @@ def test_parse_selectors_rejects_out_of_window_offset() -> None:
         selection.parse_selectors(["4"], available=3)
 
 
+def test_selector_extent_reports_oldest_required_position_without_expanding_ranges() -> None:
+    assert selection.selector_extent(["1", "3,7", "10-250"]) == 250
+
+
+@pytest.mark.parametrize("token", ["1", "1,3,7", "2-5", "1,3-5,9", "0", "3-2"])
+def test_selector_shaped_tokens_are_recognized(token: str) -> None:
+    assert selection.looks_like_selector(token)
+
+
+@pytest.mark.parametrize("token", ["pick", "doctor", "--json", "1x", ""])
+def test_nonselector_tokens_are_not_recognized(token: str) -> None:
+    assert not selection.looks_like_selector(token)
+
+
 def test_select_entries_returns_oldest_first() -> None:
     entries = [
         HistoryEntry("3", "newest"),
