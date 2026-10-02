@@ -33,6 +33,34 @@ def test_picker_toggles_multiple_commands_and_confirms_oldest_first() -> None:
     asyncio.run(exercise())
 
 
+def test_picker_supports_vim_navigation() -> None:
+    async def exercise() -> None:
+        app = picker.CommandPicker(
+            [
+                HistoryEntry("4", "newest"),
+                HistoryEntry("3", "second"),
+                HistoryEntry("2", "third"),
+                HistoryEntry("1", "oldest"),
+            ]
+        )
+        async with app.run_test(size=(100, 16)) as pilot:
+            choices = app.query_one("#commands", SelectionList)
+            assert choices.highlighted == 0
+            await pilot.press("j", "j")
+            assert choices.highlighted == 2
+            await pilot.press("k")
+            assert choices.highlighted == 1
+            await pilot.press("g")
+            assert choices.highlighted == 0
+            await pilot.press("shift+g")
+            assert choices.highlighted == 3
+            await pilot.press("space", "enter")
+
+        assert app.return_value == [3]
+
+    asyncio.run(exercise())
+
+
 def test_picker_preselects_records_by_id() -> None:
     async def exercise() -> None:
         app = picker.CommandPicker(
