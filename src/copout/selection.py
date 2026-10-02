@@ -15,8 +15,10 @@ class SelectionError(ValueError):
 
 def looks_like_selector(token: str) -> bool:
     """Return whether a CLI token is shaped like a history selector."""
-    return bool(token) and any(char.isdigit() for char in token) and all(
-        char.isdigit() or char in ",-" for char in token
+    return (
+        bool(token)
+        and any(char.isdigit() for char in token)
+        and all(char.isdigit() or char in ",-" for char in token)
     )
 
 

@@ -607,7 +607,9 @@ def pick_command(
     if merged_json and merged_markdown:
         raise typer.BadParameter("--json and --markdown cannot be combined")
     if inherited.last is not None or inherited.failure:
-        raise typer.BadParameter("positional/TUI selection cannot be combined with --last or --failure")
+        raise typer.BadParameter(
+            "positional/TUI selection cannot be combined with --last or --failure"
+        )
 
     merged_preselect = [*inherited.preselect, *(preselect or [])]
     merged_preselect_records = [*inherited.preselect_records, *(preselect_records or [])]

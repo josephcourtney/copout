@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from copout import doctor
 from copout.atuin import DaemonInfo, HistoryEntry
-from copout.doctor import Diagnostic
 
 DEFAULT_DAEMON = DaemonInfo("/tmp/atuin.sock", True, "18.23.0", 123, 3)
 DEFAULT_LATEST = HistoryEntry("id", "false", "/tmp", 1, 0.01, "", "captured\n")
