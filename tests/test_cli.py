@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from typer.testing import CliRunner
 
 from copout import cli, record
@@ -163,6 +165,50 @@ def test_context_cli_overrides_config_defaults(monkeypatch) -> None:
     assert options.shell_version is True
     assert options.env == ("TERM",)
     assert options.executables == ("git",)
+
+
+def test_context_cli_overrides_config_file(monkeypatch, tmp_path: Path) -> None:
+    config_path = tmp_path / "copout.toml"
+    config_path.write_text(
+        """
+[context]
+git = true
+hostname = false
+env = ["LANG"]
+executables = ["python"]
+""".strip()
+    )
+    observed = []
+
+    def build_record(*, context_options) -> dict:
+        observed.append(context_options)
+        return _record_fixture()
+
+    monkeypatch.setattr(cli.record, "build_record", build_record)
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "--config",
+            str(config_path),
+            "--no-git-context",
+            "--hostname-context",
+            "--env",
+            "TERM",
+            "--resolve",
+            "git",
+            "--print",
+            "--last",
+            "1",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stderr
+    options = observed[0]
+    assert options.git is False
+    assert options.hostname is True
+    assert options.env == ("LANG", "TERM")
+    assert options.executables == ("python", "git")
 
 
 def test_atuin_failure_goes_to_stderr_and_returns_exit_3(monkeypatch) -> None:
