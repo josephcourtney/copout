@@ -53,7 +53,11 @@ def test_pick_explicit_selectors_are_noninteractive(monkeypatch) -> None:
         HistoryEntry("2", "middle", output="middle\n"),
         HistoryEntry("1", "oldest", output="old\n"),
     ]
-    monkeypatch.setattr(cli.atuin, "recent_history", lambda limit: entries)
+    monkeypatch.setattr(
+        cli.atuin,
+        "recent_history",
+        lambda limit, *, required_ids=(): entries,
+    )
     monkeypatch.setattr(cli.atuin, "hydrate_outputs", lambda selected: selected)
 
     def must_not_pick(candidates: list[HistoryEntry]) -> list[HistoryEntry] | None:
@@ -122,7 +126,11 @@ def test_pick_rejects_mixed_selector_modes() -> None:
 
 def test_pick_markdown_output(monkeypatch) -> None:
     entries = [HistoryEntry("2", "newest", output="new"), HistoryEntry("1", "oldest")]
-    monkeypatch.setattr(cli.atuin, "recent_history", lambda limit: entries)
+    monkeypatch.setattr(
+        cli.atuin,
+        "recent_history",
+        lambda limit, *, required_ids=(): entries,
+    )
     monkeypatch.setattr(cli.atuin, "hydrate_outputs", lambda selected: selected)
 
     result = runner.invoke(cli.app, ["pick", "1-2", "--markdown", "--print"])
@@ -134,7 +142,11 @@ def test_pick_markdown_output(monkeypatch) -> None:
 
 def test_pick_without_selectors_uses_inline_picker(monkeypatch) -> None:
     entries = [HistoryEntry("2", "newest"), HistoryEntry("1", "oldest")]
-    monkeypatch.setattr(cli.atuin, "recent_history", lambda limit: entries)
+    monkeypatch.setattr(
+        cli.atuin,
+        "recent_history",
+        lambda limit, *, required_ids=(): entries,
+    )
     monkeypatch.setattr(cli.atuin, "hydrate_outputs", lambda selected: selected)
     monkeypatch.setattr(
         cli,
@@ -151,7 +163,11 @@ def test_pick_without_selectors_uses_inline_picker(monkeypatch) -> None:
 
 def test_pick_cancel_does_not_hydrate_or_touch_clipboard(monkeypatch) -> None:
     entries = [HistoryEntry("1", "newest")]
-    monkeypatch.setattr(cli.atuin, "recent_history", lambda limit: entries)
+    monkeypatch.setattr(
+        cli.atuin,
+        "recent_history",
+        lambda limit, *, required_ids=(): entries,
+    )
     monkeypatch.setattr(
         cli,
         "_pick_entries",
@@ -176,7 +192,11 @@ def test_pick_cancel_does_not_hydrate_or_touch_clipboard(monkeypatch) -> None:
 
 
 def test_pick_rejects_out_of_window_selector(monkeypatch) -> None:
-    monkeypatch.setattr(cli.atuin, "recent_history", lambda limit: [HistoryEntry("1", "one")])
+    monkeypatch.setattr(
+        cli.atuin,
+        "recent_history",
+        lambda limit, *, required_ids=(): [HistoryEntry("1", "one")],
+    )
 
     result = runner.invoke(cli.app, ["pick", "2", "--print"])
 
@@ -187,7 +207,11 @@ def test_pick_rejects_out_of_window_selector(monkeypatch) -> None:
 def test_pick_hydrates_only_selected_entries(monkeypatch) -> None:
     entries = [HistoryEntry(str(index), f"cmd {index}") for index in range(5, 0, -1)]
     hydrated_ids: list[str] = []
-    monkeypatch.setattr(cli.atuin, "recent_history", lambda limit: entries)
+    monkeypatch.setattr(
+        cli.atuin,
+        "recent_history",
+        lambda limit, *, required_ids=(): entries,
+    )
 
     def hydrate(selected: list[HistoryEntry]) -> list[HistoryEntry]:
         hydrated_ids.extend(entry.id for entry in selected)
