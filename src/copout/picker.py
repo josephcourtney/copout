@@ -89,6 +89,8 @@ class CommandPicker(App[list[int] | None]):
 
     @staticmethod
     def _help_text(selected: int) -> str:
+        if selected == 0:
+            return "0 selected  Enter copies latest  ↑↓/jk navigate  Space toggle  Esc/q cancel"
         return f"{selected} selected  ↑↓/jk navigate  Space toggle  Enter copy  Esc/q cancel"
 
     def _choices(self) -> SelectionList:
@@ -113,14 +115,9 @@ class CommandPicker(App[list[int] | None]):
         self._choices().action_page_up()
 
     def action_confirm(self) -> None:
-        choices = self._choices()
-        selected = [int(value) for value in choices.selected]
+        selected = [int(value) for value in self._choices().selected]
         if not selected:
-            self.query_one("#picker-help", Static).update(
-                "Select at least one command  ↑↓/jk navigate  Space toggle  Esc/q cancel"
-            )
-            self.bell()
-            return
+            selected = [0]
 
         # Candidates are newest-first; larger indexes are older. Emit oldest-first.
         self.exit(sorted(selected, reverse=True))
