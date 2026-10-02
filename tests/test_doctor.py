@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copout import doctor
 from copout.atuin import DaemonInfo, HistoryEntry
+from copout.doctor import Diagnostic
 
 DEFAULT_DAEMON = DaemonInfo("/tmp/atuin.sock", True, "18.23.0", 123, 3)
 DEFAULT_LATEST = HistoryEntry("id", "false", "/tmp", 1, 0.01, "", "captured\n")
@@ -169,3 +170,16 @@ def test_inspect_reads_history_before_starting_daemon_client(monkeypatch) -> Non
     assert result.output_enabled is True
     assert result.pty_proxy_active is True
     assert calls == ["history", "daemon"]
+
+
+def test_manual_active_proxy_is_valid_capture_configuration():
+    diagnostic = Diagnostic(
+        daemon_enabled=True,
+        pty_proxy_enabled=False,
+        output_enabled=True,
+        pty_proxy_active=True,
+        daemon=healthy_daemon,
+        latest=entry_with_output,
+    )
+
+    assert _verification(diagnostic).ok

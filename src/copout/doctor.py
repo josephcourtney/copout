@@ -103,7 +103,7 @@ def inspect() -> Diagnostic:
 def _state(value: bool | None) -> str:
     if value is None:
         return "unavailable"
-    return "yes" if value else "NO"
+    return "yes" if value else "no (manual proxy)"
 
 
 def _verification(result: Diagnostic) -> Verification:
@@ -156,7 +156,11 @@ def doctor() -> int:
     print(f"  output.enabled:    {_state(result.output_enabled)}")
 
     print("\nruntime:")
+    if result.pty_proxy_active and result.pty_proxy_enabled is False:
+        print("  pty-proxy mode:    manual")
+
     print(f"  pty-proxy active:  {'yes' if result.pty_proxy_active else 'NO'}")
+
     if result.daemon is None:
         print("  jerakeen daemon:   NO")
         if result.daemon_error:
@@ -189,14 +193,12 @@ def doctor() -> int:
         print("  Inspect `atuin history list --session` next.")
         return 4
 
-    capture_configured = all(
-        value is True
-        for value in (
-            result.daemon_enabled,
-            result.pty_proxy_enabled,
-            result.output_enabled,
-        )
+    capture_configured = (
+        result.daemon_enabled is True
+        and result.output_enabled is True
+        and (result.pty_proxy_enabled is True or result.pty_proxy_active)
     )
+
     if not capture_configured:
         print("\ndiagnosis:")
         print("  PARTIAL: Atuin history works, but command-output capture is not fully configured.")
@@ -223,8 +225,9 @@ def doctor() -> int:
 
     if result.latest.output is None:
         print("\ndiagnosis:")
-        print("  PARTIAL: output capture, pty-proxy, and the Atuin daemon are enabled,")
-        print("  but command output was not captured for the latest command.")
+        print("  PARTIAL: output capture is enabled, an Atuin PTY proxy is active,")
+        print("  and the daemon is reachable, but no captured output was returned")
+        print("  for the latest command.")
         print("  Run a new command and rerun `copout verify`; if it still fails, inspect")
         print("  the pty-proxy capture path and OSC 133 shell markers.")
         return 5

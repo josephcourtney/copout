@@ -168,8 +168,13 @@ async def _add_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
                 return replace(entry, output_error="Atuin daemon output request timed out")
             except Exception as exc:  # preserve history, but report why output is unavailable
                 return replace(entry, output_error=_output_error(exc))
+
             if output is None:
-                return entry
+                return replace(
+                    entry,
+                    output_error="Atuin daemon returned no captured output for this history entry",
+                )
+
             return replace(
                 entry,
                 output=output.text,
