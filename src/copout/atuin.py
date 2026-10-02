@@ -13,12 +13,14 @@ from jerakeen import AtuinUnsupportedError, connect
 from ._process import run_process
 
 _DAEMON_TIMEOUT = 3.0
+_OUTPUT_CONCURRENCY = 16
 
 _HISTORY_FIELD_SEPARATOR = "\x1f"
 _HISTORY_FORMAT = _HISTORY_FIELD_SEPARATOR.join(
     ("{uuid}", "{time}", "{directory}", "{exit}", "{duration}", "{command}")
 )
 _DURATION_RE = re.compile(r"([0-9]+(?:\.[0-9]+)?)(ns|µs|us|ms|s|m|h)")
+_PYTHON_COMMAND_RE = re.compile(r"python(?:\d+(?:\.\d+)*)?")
 _DURATION_SCALE = {
     "ns": 1e-9,
     "µs": 1e-6,
@@ -131,6 +133,14 @@ def _load_history() -> list[HistoryEntry]:
     return _parse_history_list(result.stdout)
 
 
+def _command_name(word: str) -> str:
+    return word.rsplit("/", 1)[-1]
+
+
+def _is_python_command(word: str) -> bool:
+    return _PYTHON_COMMAND_RE.fullmatch(_command_name(word)) is not None
+
+
 def _is_copout_command(command: str) -> bool:
     try:
         words = shlex.split(command)
@@ -138,11 +148,27 @@ def _is_copout_command(command: str) -> bool:
         words = command.split()
     if not words:
         return False
-    if words[0].rsplit("/", 1)[-1] == "uv" and words[1:2] == ["run"]:
+
+    if _command_name(words[0]) == "command":
+        words = words[1:]
+    if not words:
+        return False
+
+    launcher = _command_name(words[0])
+    if launcher == "uv" and words[1:2] == ["run"]:
         words = words[2:]
         if words[:1] == ["--"]:
             words = words[1:]
-    return bool(words) and words[0].rsplit("/", 1)[-1] == "copout"
+    elif launcher == "uvx":
+        words = words[1:]
+        if words[:1] == ["--"]:
+            words = words[1:]
+
+    if not words:
+        return False
+    if _command_name(words[0]) == "copout":
+        return True
+    return _is_python_command(words[0]) and words[1:3] == ["-m", "copout.cli"]
 
 
 def _output_error(exc: Exception) -> str:
@@ -153,34 +179,36 @@ def _output_error(exc: Exception) -> str:
 
 async def _add_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
     async with connect(timeout=_DAEMON_TIMEOUT, rpc_timeout=_DAEMON_TIMEOUT) as atuin:
+        semaphore = asyncio.Semaphore(_OUTPUT_CONCURRENCY)
 
         async def populate(entry: HistoryEntry) -> HistoryEntry:
-            try:
-                async with asyncio.timeout(_DAEMON_TIMEOUT):
-                    output = await atuin.history.output(entry.id)
-            except AtuinUnsupportedError as exc:
-                detail = " ".join(str(exc).split())[:500]
-                error = "Atuin daemon does not implement command-output retrieval"
-                if detail:
-                    error = f"{error} ({detail})"
-                return replace(entry, output_error=error)
-            except TimeoutError:
-                return replace(entry, output_error="Atuin daemon output request timed out")
-            except Exception as exc:  # preserve history, but report why output is unavailable
-                return replace(entry, output_error=_output_error(exc))
+            async with semaphore:
+                try:
+                    async with asyncio.timeout(_DAEMON_TIMEOUT):
+                        output = await atuin.history.output(entry.id)
+                except AtuinUnsupportedError as exc:
+                    detail = " ".join(str(exc).split())[:500]
+                    error = "Atuin daemon does not implement command-output retrieval"
+                    if detail:
+                        error = f"{error} ({detail})"
+                    return replace(entry, output_error=error)
+                except TimeoutError:
+                    return replace(entry, output_error="Atuin daemon output request timed out")
+                except Exception as exc:  # preserve history, but report why output is unavailable
+                    return replace(entry, output_error=_output_error(exc))
 
-            if output is None:
+                if output is None:
+                    return replace(
+                        entry,
+                        output_error="Atuin daemon returned no captured output for this history entry",
+                    )
+
                 return replace(
                     entry,
-                    output_error="Atuin daemon returned no captured output for this history entry",
+                    output=output.text,
+                    output_truncated=output.truncated,
+                    output_observed_bytes=output.observed_bytes,
                 )
-
-            return replace(
-                entry,
-                output=output.text,
-                output_truncated=output.truncated,
-                output_observed_bytes=output.observed_bytes,
-            )
 
         return list(await asyncio.gather(*(populate(entry) for entry in entries)))
 
@@ -193,8 +221,9 @@ def recent_history(
 ) -> list[HistoryEntry]:
     """Return recent matching history newest-first without contacting the daemon.
 
-    required_ids extends the normal candidate window so integrations can select
-    exact Atuin records without falling back to command-text or history-offset matching.
+    required_ids extends the normal candidate window contiguously through the
+    oldest required record. This preserves true relative history positions in
+    interactive displays while still rejecting unknown IDs in the selection layer.
     """
 
     def selected(entry: HistoryEntry) -> bool:
@@ -205,9 +234,13 @@ def recent_history(
     requested = max(count, 1)
     required = set(required_ids)
     entries = [entry for entry in _load_history() if selected(entry)]
-    return [
-        entry for index, entry in enumerate(entries) if index < requested or entry.id in required
-    ]
+    if required:
+        required_positions = [
+            index for index, entry in enumerate(entries, start=1) if entry.id in required
+        ]
+        if required_positions:
+            requested = max(requested, max(required_positions))
+    return entries[:requested]
 
 
 def hydrate_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
