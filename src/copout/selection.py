@@ -13,14 +13,18 @@ class SelectionError(ValueError):
     """Invalid or unavailable command selection."""
 
 
-def parse_selectors(tokens: Sequence[str], *, available: int) -> list[int]:
-    """Return selected zero-based newest-first offsets, sorted oldest-first."""
+def looks_like_selector(token: str) -> bool:
+    """Return whether a CLI token is shaped like a history selector."""
+    return bool(token) and any(char.isdigit() for char in token) and all(
+        char.isdigit() or char in ",-" for char in token
+    )
+
+
+def _selector_spans(tokens: Sequence[str]) -> list[tuple[int, int]]:
     if not tokens:
         raise SelectionError("no commands selected")
-    if available < 1:
-        raise SelectionError("no recent commands are available")
 
-    selected: set[int] = set()
+    spans: list[tuple[int, int]] = []
     for token in tokens:
         for raw_part in token.split(","):
             part = raw_part.strip()
@@ -35,21 +39,36 @@ def parse_selectors(tokens: Sequence[str], *, available: int) -> list[int]:
                     raise SelectionError("selectors are 1-based and must be positive")
                 if end < start:
                     raise SelectionError(f"range {part!r} must run from newer to older")
-                values = range(start, end + 1)
             else:
                 if not part.isdigit():
                     raise SelectionError(f"invalid selector {part!r}")
-                value = int(part)
-                if value < 1:
+                start = end = int(part)
+                if start < 1:
                     raise SelectionError("selectors are 1-based and must be positive")
-                values = (value,)
+            spans.append((start, end))
+    return spans
 
-            for value in values:
-                if value > available:
-                    raise SelectionError(
-                        f"selector {value} is outside the {available} available commands"
-                    )
-                selected.add(value - 1)
+
+def selector_extent(tokens: Sequence[str]) -> int:
+    """Return the oldest 1-based history position needed by selectors."""
+    return max(end for _, end in _selector_spans(tokens))
+
+
+def parse_selectors(tokens: Sequence[str], *, available: int) -> list[int]:
+    """Return selected zero-based newest-first offsets, sorted oldest-first."""
+    if not tokens:
+        raise SelectionError("no commands selected")
+    if available < 1:
+        raise SelectionError("no recent commands are available")
+
+    spans = _selector_spans(tokens)
+    for _, end in spans:
+        if end > available:
+            raise SelectionError(f"selector {end} is outside the {available} available commands")
+
+    selected: set[int] = set()
+    for start, end in spans:
+        selected.update(range(start - 1, end))
 
     # Candidates are newest-first; larger offsets are older. Emit oldest-first.
     return sorted(selected, reverse=True)
