@@ -48,6 +48,34 @@ executables = ["git", "python"]
     assert options.executables == ("git", "python")
 
 
+def test_context_config_path_precedence(monkeypatch, tmp_path: Path) -> None:
+    xdg_home = tmp_path / "xdg"
+    xdg_path = xdg_home / "copout" / "config.toml"
+    xdg_path.parent.mkdir(parents=True)
+    xdg_path.write_text("[context]\ngit = false\nhostname = false\n")
+
+    environment_path = tmp_path / "environment.toml"
+    environment_path.write_text("[context]\ngit = true\nhostname = true\n")
+
+    explicit_path = tmp_path / "explicit.toml"
+    explicit_path.write_text("[context]\ngit = false\nhostname = true\n")
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_home))
+    monkeypatch.delenv("COPOUT_CONFIG", raising=False)
+    xdg_options = load_context_options()
+    assert xdg_options.git is False
+    assert xdg_options.hostname is False
+
+    monkeypatch.setenv("COPOUT_CONFIG", str(environment_path))
+    environment_options = load_context_options()
+    assert environment_options.git is True
+    assert environment_options.hostname is True
+
+    explicit_options = load_context_options(explicit_path)
+    assert explicit_options.git is False
+    assert explicit_options.hostname is True
+
+
 def test_git_context_marks_state_as_observed_at_capture(monkeypatch) -> None:
     responses = {
         ("rev-parse", "--show-toplevel"): "/repo",
