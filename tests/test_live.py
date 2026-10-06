@@ -139,12 +139,29 @@ def _python_fd2_probe(marker: str) -> str:
     return f"{shlex.quote(sys.executable)} -c {shlex.quote(program)}"
 
 
+def _python_stderr_burst_probe(start_marker: str, end_marker: str) -> str:
+    start_midpoint = max(1, len(start_marker) // 2)
+    end_midpoint = max(1, len(end_marker) // 2)
+    start_left, start_right = start_marker[:start_midpoint], start_marker[start_midpoint:]
+    end_left, end_right = end_marker[:end_midpoint], end_marker[end_midpoint:]
+    program = (
+        "import sys; "
+        f'sys.stderr.write("{start_left}" + "{start_right}\\n" + '
+        '"x" * 32768 + '
+        f'"\\n{end_left}" + "{end_right}\\n"); '
+        "sys.stderr.flush()"
+    )
+    return f"{shlex.quote(sys.executable)} -c {shlex.quote(program)}"
+
+
 _STDERR_BUILTIN = "__COPOUT_STDERR_BUILTIN__"
 _STDERR_NO_NEWLINE = "__COPOUT_STDERR_NO_NEWLINE__"
 _STDERR_CHILD = "__COPOUT_STDERR_CHILD__"
 _STDERR_REDIRECTED_STDOUT = "__COPOUT_STDERR_STDOUT_REDIRECTED__"
 _STDERR_PIPELINE = "__COPOUT_STDERR_PIPELINE__"
 _STDERR_FD2 = "__COPOUT_STDERR_FD2__"
+_STDERR_BURST_START = "__COPOUT_STDERR_BURST_START__"
+_STDERR_BURST_END = "__COPOUT_STDERR_BURST_END__"
 _STDOUT_BEFORE = "__COPOUT_STDOUT_BEFORE__"
 _STDERR_MIDDLE = "__COPOUT_STDERR_MIDDLE__"
 _STDOUT_AFTER = "__COPOUT_STDOUT_AFTER__"
@@ -180,6 +197,11 @@ _BASE_STDERR_PROBES = (
         "direct-fd2-write",
         _python_fd2_probe(_STDERR_FD2),
         (_STDERR_FD2,),
+    ),
+    _Probe(
+        "buffered-stderr-burst",
+        _python_stderr_burst_probe(_STDERR_BURST_START, _STDERR_BURST_END),
+        (_STDERR_BURST_START, _STDERR_BURST_END),
     ),
     _Probe(
         "mixed-stdout-stderr",
@@ -345,7 +367,10 @@ def test_live_shell_captures_unredirected_stderr(
     _assert_probe_captured(live_stderr_session, _PROBE_BY_NAME[probe_name])
 
 
-@pytest.mark.parametrize("probe_name", ["child-stderr", "direct-fd2-write"])
+@pytest.mark.parametrize(
+    "probe_name",
+    ["child-stderr", "direct-fd2-write", "buffered-stderr-burst"],
+)
 def test_live_shell_captures_child_process_stderr(
     live_stderr_session: _ProbeSession,
     probe_name: str,
