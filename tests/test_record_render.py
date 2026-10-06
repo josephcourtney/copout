@@ -24,12 +24,17 @@ def test_build_record(monkeypatch) -> None:
         ],
     )
     result = record.build_record()
-    assert result["version"] == 7
+    assert result["version"] == 8
     assert result["source"] == "atuin"
-    assert result["command"] == "pytest"
-    assert result["result"]["status"] == 1
-    assert result["output"]["text"] == "FAILED\n"
-    assert result["output"]["captured_bytes"] == len(b"FAILED\n")
+    assert "scope" not in result
+    assert "history" not in result
+    assert len(result["runs"]) == 1
+    run = result["runs"][0]
+    assert run["history_id"] == "id1"
+    assert run["command"] == "pytest"
+    assert run["result"]["status"] == 1
+    assert run["output"]["text"] == "FAILED\n"
+    assert run["output"]["captured_bytes"] == len(b"FAILED\n")
     assert "capture" not in result
 
 
@@ -44,7 +49,7 @@ def test_build_record_rejects_empty_history(monkeypatch) -> None:
         raise AssertionError("expected AtuinError")
 
 
-def test_build_history_reports_output_count_without_redundant_capture_metadata(monkeypatch) -> None:
+def test_build_history_uses_same_universal_envelope(monkeypatch) -> None:
     monkeypatch.setattr(
         record,
         "recent_entries",
@@ -56,8 +61,10 @@ def test_build_history_reports_output_count_without_redundant_capture_metadata(m
 
     result = record.build_history(count=2)
 
+    assert result["version"] == 8
     assert result["source"] == "atuin"
-    assert result["history"]["outputs_available"] == 1
+    assert "scope" not in result
+    assert "history" not in result
     assert "capture" not in result
     assert [run["output"]["source"] for run in result["runs"]] == [
         "atuin-history-only",
@@ -73,12 +80,16 @@ def test_render_json_uses_semantic_output(monkeypatch) -> None:
     )
     rendered = render.render(record.build_record(), as_json=True)
     payload = json.loads(rendered)
-    assert payload["history_id"] == "id1"
-    assert payload["version"] == 7
+    assert payload["version"] == 8
     assert payload["source"] == "atuin"
-    assert payload["output"]["text"] == "hi"
-    assert payload["output"]["captured_bytes"] == 2
-    assert "utf8_bytes" not in payload["output"]
+    assert "scope" not in payload
+    assert "history" not in payload
+    assert len(payload["runs"]) == 1
+    run = payload["runs"][0]
+    assert run["history_id"] == "id1"
+    assert run["output"]["text"] == "hi"
+    assert run["output"]["captured_bytes"] == 2
+    assert "utf8_bytes" not in run["output"]
 
 
 def test_render_xml_is_compact_semantic_context(monkeypatch) -> None:
@@ -90,11 +101,16 @@ def test_render_xml_is_compact_semantic_context(monkeypatch) -> None:
         ],
     )
     root = ElementTree.fromstring(render.render(record.build_record()))
-    assert root.attrib["version"] == "7"
+    assert root.attrib["version"] == "8"
     assert "captured_at" in root.attrib
     run = root.find("run")
     assert run is not None
-    assert run.attrib == {"status": "0", "cwd": "/tmp", "duration_ms": "102"}
+    assert run.attrib == {
+        "history_id": "id1",
+        "status": "0",
+        "cwd": "/tmp",
+        "duration_ms": "102",
+    }
     assert run.findtext("command") == "echo <x>"
     output = run.find("output")
     assert output is not None
@@ -102,12 +118,14 @@ def test_render_xml_is_compact_semantic_context(monkeypatch) -> None:
     assert output.text == "<x>"
 
 
-def test_history_xml_omits_redundant_selected_attribute() -> None:
-    history = record.build_history_from_entries([HistoryEntry("id", "echo hi", output="hi\n")])
-    root = ElementTree.fromstring(render.render(history))
-    assert root.attrib["version"] == "7"
+def test_one_run_xml_uses_same_envelope_and_includes_history_id() -> None:
+    captured = record.build_record_from_entries([HistoryEntry("id", "echo hi", output="hi\n")])
+    root = ElementTree.fromstring(render.render(captured))
+    assert root.attrib["version"] == "8"
     assert "captured_at" in root.attrib
-    assert len(root.findall("run")) == 1
+    runs = root.findall("run")
+    assert len(runs) == 1
+    assert runs[0].attrib["history_id"] == "id"
 
 
 def test_xml_attribute_pretty_printing_is_opt_in(monkeypatch) -> None:
@@ -119,8 +137,15 @@ def test_xml_attribute_pretty_printing_is_opt_in(monkeypatch) -> None:
     compact = render.render(record.build_record())
     pretty = render.render(record.build_record(), pretty_attributes=True)
 
-    assert '<run status="0" cwd="/tmp" duration_ms="121">' in compact
-    assert '<run\n    status="0"\n    cwd="/tmp"\n    duration_ms="121">' in pretty
+    assert '<run history_id="id" status="0" cwd="/tmp" duration_ms="121">' in compact
+    assert (
+        '<run\n'
+        '    history_id="id"\n'
+        '    status="0"\n'
+        '    cwd="/tmp"\n'
+        '    duration_ms="121">'
+        in pretty
+    )
 
 
 def test_xml_exposes_recorded_at(monkeypatch) -> None:
@@ -214,7 +239,7 @@ def test_extended_capture_metadata_is_emitted_for_incomplete_output(monkeypatch)
 
 def test_unavailable_capture_metadata_is_unknown(monkeypatch) -> None:
     monkeypatch.setattr(record, "recent_entries", lambda count: [HistoryEntry("id", "true")])
-    output = record.build_record()["output"]
+    output = record.build_record()["runs"][0]["output"]
     assert output["truncated"] is None
     assert output["observed_bytes"] is None
     assert output["total_bytes"] is None
@@ -227,7 +252,7 @@ def test_markdown_uses_safe_fences_and_reports_output_states() -> None:
         HistoryEntry("2", "false", output=None, output_error="daemon\nfailed"),
         HistoryEntry("3", "build", output="partial", output_truncated=True),
     ]
-    markdown = render.render(record.build_history_from_entries(entries), as_markdown=True)
+    markdown = render.render(record.build_record_from_entries(entries), as_markdown=True)
 
     assert "`````\na\n````\nb\n`````" in markdown
     assert 'cwd ``"/tmp/`\\nnext"``' in markdown
@@ -239,7 +264,7 @@ def test_markdown_uses_safe_fences_and_reports_output_states() -> None:
 
 def test_markdown_reports_presentation_truncation() -> None:
     entry = HistoryEntry("1", "build", output="x" * (render.MAX_OUTPUT_BYTES_PER_RUN + 100))
-    markdown = render.render(record.build_history_from_entries([entry]), as_markdown=True)
+    markdown = render.render(record.build_record_from_entries([entry]), as_markdown=True)
 
     assert "Note: Copout omitted " in markdown
     assert "[copout omitted" in markdown
