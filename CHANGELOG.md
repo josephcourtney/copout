@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.11.0 - 2026-10-06
+
+### Added
+
+- Add real-shell/Atuin end-to-end coverage for stderr capture across shell builtins, child processes, direct fd 2 writes, buffered bursts, nonzero exits, pipelines, redirected stdout, missing final newlines, mixed stdout/stderr ordering, and rapid independent commands.
+- Record each stderr probe's observed child-PTY transcript so failures can distinguish command emission, history recording, daemon-output availability, and loss between the terminal and Atuin-retrieved output.
+- Add `COPOUT_STDERR_STRESS_COUNT` for targeted high-count stderr reproduction runs.
+
 ### Changed
 
 - Advance structured output to schema version 8 with one universal capture envelope: every result contains a non-empty `runs` array, including single-command captures.
