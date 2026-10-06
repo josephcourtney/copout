@@ -6,7 +6,7 @@ Copout is a small, invocation-driven adapter around Atuin. Atuin remains the sou
 
 The current codebase includes:
 
-- compact XML schema version 7 plus JSON and Markdown renderers;
+- compact XML schema version 8 plus JSON and Markdown renderers, using one universal capture envelope with a non-empty `runs` array;
 - selector-first CLI UX: bare `copout` opens the interactive picker, while root positional selectors gather exact recent-history positions noninteractively;
 - relative TUI preselection through `--preselect` and stable Atuin record-ID preselection through `--preselect-records`;
 - bounded Textual selection with arrow and Vim-style navigation;
@@ -20,7 +20,7 @@ The current codebase includes:
 
 Selector-first dispatch, picker navigation, relative/stable preselection, empty-selection Enter behavior, and legacy `pick` compatibility have been implemented and locally validated. Stable record-ID preselection expands the candidate window contiguously so displayed positions retain their true relative-history meaning.
 
-## Current stabilization tranche
+## Completed stabilization tranche
 
 1. Reject history-count queries that match no commands instead of emitting successful empty history records.
 2. Recognize supported Copout wrapper/module invocation forms when excluding Copout itself from candidate history.
@@ -29,11 +29,15 @@ Selector-first dispatch, picker navigation, relative/stable preselection, empty-
 5. Cover config-path selection and CLI-over-config precedence with regression tests.
 6. Run `just repair` and `just check` in the local project environment before merging.
 
+## Schema v8 implementation
+
+Schema v8 replaces the distinct command/history record shapes with one capture envelope. Every successful capture has root capture metadata plus a non-empty `runs` array. The schema removes `scope` and the old `history` summary, always carries each run's Atuin `history_id`, and applies the same presentation-budget rules regardless of selection syntax or run count. Query intent remains a CLI concern rather than part of the output type.
+
 ## Next release work
 
-1. Exercise selector-first and empty-selection picker behavior in normal interactive use after stabilization lands.
-2. Keep package/version metadata, lockfile, changelog, README, policy, contributor guidance, and schema documentation synchronized before the next release bump.
-3. Decide deliberately whether schema v8 should unify single-command and one-run history output into one stable envelope; do not change schema-v7 shape implicitly.
+1. Run `just repair` and `just check` locally for the schema-v8 branch before merging.
+2. Exercise selector-first and empty-selection picker behavior in normal interactive use after schema v8 lands.
+3. Keep package/version metadata, lockfile, changelog, README, policy, contributor guidance, and schema documentation synchronized before the next release bump.
 4. Review whether the live-shell integration test should use a dedicated Atuin session identity to reduce user-history side effects while preserving real integration coverage.
 5. Consider an upper compatibility bound for Typer because Copout subclasses `TyperGroup`; make dependency/lockfile changes only with local validation.
 6. Do not add release automation, CI, or publication machinery without a concrete need.
