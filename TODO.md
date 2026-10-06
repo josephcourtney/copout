@@ -1,46 +1,31 @@
 # TODO
 
-## Current stabilization
+## 0.11.0 release
 
-- [x] Make the TUI the default for bare `copout` while keeping explicit selectors noninteractive.
-- [x] Preserve relative and stable-ID TUI preselection.
-- [x] Add Vim-style picker navigation and default empty-selection Enter to history position `1`.
-- [x] Reject empty history-count results instead of emitting successful zero-run records.
-- [x] Recognize supported Copout module/wrapper invocation forms when filtering candidate history.
-- [x] Extend stable-ID candidate windows contiguously so picker numbering remains accurate.
-- [x] Bound concurrent Atuin output hydration requests.
-- [x] Add config-path and CLI-over-config precedence regression coverage.
-- [x] Run `just repair` and `just check` on `stabilize-selection-and-hydration` and merge only after both pass.
-
-## Schema v8
-
-- [x] Replace distinct command/history record shapes with one universal capture envelope.
-- [x] Remove `scope` and the old `history` summary object.
-- [x] Always expose selected commands through a non-empty `runs` array and include `history_id` consistently in XML.
-- [x] Apply presentation budgets uniformly to one-run and multi-run captures.
-- [x] Update renderer tests, CLI fixtures, README, changelog, and plan for schema v8.
-- [x] Run local `just repair` and `just check` on `schema-v8-universal-envelope`, then merge only if both pass.
-
-## Stderr capture investigation
-
-- [x] Add real-shell/Atuin E2E probes for stderr-only output, child processes, direct fd 2 writes, nonzero exits, no-final-newline output, pipelines, redirected stdout, buffered bursts, mixed stdout/stderr ordering, and rapid independent commands.
-- [x] Preserve each probe's observed child-PTY transcript so failures distinguish terminal emission from Atuin/Copout capture loss.
-- [x] Make the rapid-probe count configurable through `COPOUT_STDERR_STRESS_COUNT` for targeted reproduction runs.
-- [ ] Run the new suite on the affected real environment and repeat with a substantially larger stress count.
-- [ ] If a failure reproduces, classify it as missing Atuin history, unavailable daemon output, or a sentinel present on the PTY but absent from Atuin-retrieved output before changing production code.
-
-## Next release
-
-- [ ] Update the package version only when the next release boundary is chosen; keep `uv.lock`, changelog, README, plan, and package metadata synchronized.
+- [x] Complete the selector-first CLI and picker stabilization work.
+- [x] Advance structured output to schema v8 with one universal `runs` envelope.
+- [x] Add and stress-test real-shell stderr-capture diagnostics; no loss reproduced at 200 or 1000 rapid commands.
+- [x] Bump package and lockfile metadata to 0.11.0.
+- [x] Move the accumulated Unreleased changelog into the 0.11.0 release section.
+- [x] Synchronize README/status documentation with the implemented behavior and current known concerns.
+- [ ] Run `just repair` and final `just check` on the 0.11.0 release branch.
+- [ ] Re-run the principal real-terminal workflows: bare picker, empty-selection Enter, multi-select, redirected `-p`, explicit selectors, and non-TTY failure behavior.
+- [ ] Run `just build` and inspect the wheel/sdist.
 - [ ] Tag/publish only when explicitly requested.
-- [ ] Re-run the real terminal workflows after merging stabilization: bare picker, empty-selection Enter, multi-select, redirected `-p`, explicit selectors, and non-TTY failure behavior.
+
+## Unconfirmed stderr observation
+
+- [x] Add real-shell/Atuin E2E probes that preserve both the child-PTY observation and Atuin/Copout result.
+- [x] Exercise stderr from shell builtins, child processes, direct fd 2 writes, buffered bursts, nonzero exits, pipelines, redirected stdout, missing final newlines, and mixed stdout/stderr.
+- [x] Run rapid independent stderr probes at counts of 200 and 1000 without reproducing loss.
+- [ ] If the behavior recurs, capture the exact command and execution context and classify the failure as missing Atuin history, unavailable daemon output, or terminal-visible data absent from Atuin-retrieved output before changing production code.
 
 ## Follow-up design decisions
 
-- [ ] Review whether the real-shell integration test can use a dedicated Atuin session identity to reduce side effects in the user's normal history without weakening the integration test.
+- [ ] Review whether real-shell integration tests can use a dedicated Atuin session identity to reduce side effects in normal user history without weakening coverage.
 - [ ] Consider an upper Typer compatibility bound because Copout subclasses `TyperGroup`; update the lockfile and validate locally if changed.
-- [ ] Review context-capture subprocess cost on large multi-run selections; optimize only if measurement shows it is material.
-- [ ] Consider additional historical context only when it can come from an authoritative upstream source. Do not infer current Git/environment state to have existed when an old command ran.
+- [ ] Measure context-capture subprocess cost on large multi-run selections; optimize only if measurement shows it is material.
+- [ ] Consider additional historical context only when it can come from an authoritative upstream source.
 - [ ] Keep optional context additions privacy-conservative and bounded; avoid adding persistent Copout state to support them.
 
 ## Previous release validation
