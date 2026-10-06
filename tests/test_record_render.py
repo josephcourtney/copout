@@ -38,6 +38,20 @@ def test_build_record(monkeypatch) -> None:
     assert "capture" not in result
 
 
+def test_single_run_builders_share_the_same_envelope(monkeypatch) -> None:
+    entry = HistoryEntry("id", "echo hi", "/tmp", 0, 0.1, "", "hi\n")
+    monkeypatch.setattr(record, "recent_entries", lambda count, *, failed_only=False: [entry])
+
+    latest = record.build_record()
+    counted = record.build_history(count=1)
+    selected = record.build_record_from_entries([entry])
+
+    assert latest.keys() == counted.keys() == selected.keys()
+    assert latest["runs"] == counted["runs"] == selected["runs"]
+    assert "scope" not in latest
+    assert "history" not in latest
+
+
 def test_build_record_rejects_empty_history(monkeypatch) -> None:
     monkeypatch.setattr(record, "recent_entries", lambda count: [])
 
