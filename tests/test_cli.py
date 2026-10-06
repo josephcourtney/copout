@@ -336,12 +336,11 @@ def test_pretty_attributes_is_opt_in(monkeypatch) -> None:
 
     assert result.exit_code == 0, result.stderr
     assert (
-        '<run\n'
+        "<run\n"
         '    history_id="abc"\n'
         '    status="0"\n'
         '    cwd="/tmp"\n'
-        '    duration_ms="10">'
-        in result.stdout
+        '    duration_ms="10">' in result.stdout
     )
 
 

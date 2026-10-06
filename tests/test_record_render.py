@@ -153,12 +153,11 @@ def test_xml_attribute_pretty_printing_is_opt_in(monkeypatch) -> None:
 
     assert '<run history_id="id" status="0" cwd="/tmp" duration_ms="121">' in compact
     assert (
-        '<run\n'
+        "<run\n"
         '    history_id="id"\n'
         '    status="0"\n'
         '    cwd="/tmp"\n'
-        '    duration_ms="121">'
-        in pretty
+        '    duration_ms="121">' in pretty
     )
 
 
