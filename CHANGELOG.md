@@ -4,6 +4,9 @@
 
 ### Changed
 
+- Advance structured output to schema version 8 with one universal capture envelope: every result contains a non-empty `runs` array, including single-command captures.
+- Remove the schema-v7 `scope` distinction and `history` summary object; query syntax no longer changes the record shape.
+- Apply presentation output budgets uniformly to one-run and multi-run captures, and always include each run's Atuin `history_id` in XML.
 - Make the interactive picker the default when `copout` is invoked without an explicit selection query; formatting and context options can be supplied before opening the picker.
 - When the interactive picker has no selected entries, pressing Enter now captures the most recent eligible command (history position `1`) instead of requiring an explicit selection.
 - Accept history selectors directly at the root, so `copout 1`, `copout 1 3`, `copout 2-5`, and comma-separated combinations gather exactly those entries without opening the TUI. Explicit selectors automatically extend history discovery far enough to resolve the oldest requested position instead of being limited by the TUI browse window.

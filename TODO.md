@@ -10,7 +10,16 @@
 - [x] Extend stable-ID candidate windows contiguously so picker numbering remains accurate.
 - [x] Bound concurrent Atuin output hydration requests.
 - [x] Add config-path and CLI-over-config precedence regression coverage.
-- [ ] Run `just repair` and `just check` on `stabilize-selection-and-hydration` and merge only after both pass.
+- [x] Run `just repair` and `just check` on `stabilize-selection-and-hydration` and merge only after both pass.
+
+## Schema v8
+
+- [x] Replace distinct command/history record shapes with one universal capture envelope.
+- [x] Remove `scope` and the old `history` summary object.
+- [x] Always expose selected commands through a non-empty `runs` array and include `history_id` consistently in XML.
+- [x] Apply presentation budgets uniformly to one-run and multi-run captures.
+- [x] Update renderer tests, CLI fixtures, README, changelog, and plan for schema v8.
+- [ ] Run local `just repair` and `just check` on `schema-v8-universal-envelope`, then merge only if both pass.
 
 ## Next release
 
@@ -20,7 +29,6 @@
 
 ## Follow-up design decisions
 
-- [ ] For schema v8, consider replacing the distinct single-command `CommandRecord` and one-run `HistoryRecord` shapes with one stable history envelope. Do not change schema-v7 shape implicitly.
 - [ ] Review whether the real-shell integration test can use a dedicated Atuin session identity to reduce side effects in the user's normal history without weakening the integration test.
 - [ ] Consider an upper Typer compatibility bound because Copout subclasses `TyperGroup`; update the lockfile and validate locally if changed.
 - [ ] Review context-capture subprocess cost on large multi-run selections; optimize only if measurement shows it is material.

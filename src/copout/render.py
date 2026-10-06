@@ -85,9 +85,7 @@ def _duration_ms(seconds: float) -> int:
 
 
 def _record_runs(record: CopoutRecord) -> list[RunRecord]:
-    if record["scope"] == "history":
-        return record["runs"]
-    return [record]
+    return record["runs"]
 
 
 def _fair_output_budgets(sizes: list[int]) -> list[int]:
@@ -148,16 +146,15 @@ def _semantic_record(record: CopoutRecord) -> CopoutRecord:
         output["text"] = text
         output["captured_bytes"] = len(text.encode())
 
-    if projected["scope"] == "history":
-        budgets = _fair_output_budgets([run["output"]["captured_bytes"] for run in runs])
-        for run, budget in zip(runs, budgets, strict=True):
-            output = run["output"]
-            text, omitted = _bound_text(output["text"], budget=budget)
-            output["text"] = text
-            output["captured_bytes"] = len(text.encode())
-            if omitted:
-                output["presentation_truncated"] = True
-                output["presentation_omitted_bytes"] = omitted
+    budgets = _fair_output_budgets([run["output"]["captured_bytes"] for run in runs])
+    for run, budget in zip(runs, budgets, strict=True):
+        output = run["output"]
+        text, omitted = _bound_text(output["text"], budget=budget)
+        output["text"] = text
+        output["captured_bytes"] = len(text.encode())
+        if omitted:
+            output["presentation_truncated"] = True
+            output["presentation_omitted_bytes"] = omitted
     return projected
 
 
@@ -347,14 +344,10 @@ def _render_git(git: GitContext, *, indent: str, pretty_attributes: bool) -> lis
 def _render_run(
     run: RunRecord,
     *,
-    include_history_id: bool,
     pretty_attributes: bool,
     indent: str = "  ",
 ) -> list[str]:
-    attrs: list[str] = []
-
-    if include_history_id:
-        attrs.append(_attribute("history_id", run["history_id"]))
+    attrs: list[str] = [_attribute("history_id", run["history_id"])]
     if (status := run["result"]["status"]) is not None:
         attrs.append(_attribute("status", status))
     if cwd := run["context"]["cwd"]:
@@ -431,10 +424,11 @@ def _render_markdown(record: CopoutRecord) -> str:
             details.append(f"captured_at {_inline_value(record['captured_at'])}")
             lines.extend(("### Environment", "", " · ".join(details), ""))
 
-    for index, run in enumerate(_record_runs(record), start=1):
+    runs = _record_runs(record)
+    for index, run in enumerate(runs, start=1):
         if lines and lines[-1] != "":
             lines.append("")
-        lines.append(f"### Run {index}" if record["scope"] == "history" else "### Command")
+        lines.append(f"### Run {index}" if len(runs) > 1 else "### Command")
         details: list[str] = []
         if (status := run["result"]["status"]) is not None:
             details.append(f"exit {status}")
@@ -486,7 +480,6 @@ def render(
         _attribute("version", projected["version"]),
         _attribute("captured_at", projected["captured_at"]),
     ]
-    include_history_id = projected["scope"] == "history"
     runs = _record_runs(projected)
 
     lines = [
@@ -502,7 +495,6 @@ def render(
         lines.extend(
             _render_run(
                 run,
-                include_history_id=include_history_id,
                 pretty_attributes=pretty_attributes,
             )
         )

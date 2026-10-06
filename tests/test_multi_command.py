@@ -246,7 +246,7 @@ def test_pick_hydrates_only_selected_entries(monkeypatch) -> None:
 
 def test_history_output_is_bounded_and_marked() -> None:
     text = "a" * (render.MAX_OUTPUT_BYTES_PER_RUN + 1000)
-    history = record.build_history_from_entries([HistoryEntry("id", "build", output=text)])
+    history = record.build_record_from_entries([HistoryEntry("id", "build", output=text)])
     payload = json.loads(render.render(history, as_json=True))
     output = payload["runs"][0]["output"]
 
@@ -260,7 +260,7 @@ def test_history_total_output_budget_is_shared() -> None:
     entries = [
         HistoryEntry(str(index), f"cmd {index}", output="x" * (200 * 1024)) for index in range(6)
     ]
-    payload = json.loads(render.render(record.build_history_from_entries(entries), as_json=True))
+    payload = json.loads(render.render(record.build_record_from_entries(entries), as_json=True))
     sizes = [run["output"]["captured_bytes"] for run in payload["runs"]]
 
     assert sum(sizes) <= render.MAX_OUTPUT_BYTES_TOTAL
@@ -268,21 +268,24 @@ def test_history_total_output_budget_is_shared() -> None:
     assert all(run["output"]["presentation_truncated"] for run in payload["runs"])
 
 
-def test_single_command_output_is_not_presentation_bounded(monkeypatch) -> None:
+def test_single_command_output_uses_same_presentation_budget(monkeypatch) -> None:
     text = "x" * (render.MAX_OUTPUT_BYTES_PER_RUN + 1000)
     monkeypatch.setattr(
         record, "recent_entries", lambda count: [HistoryEntry("id", "cmd", output=text)]
     )
 
     payload = json.loads(render.render(record.build_record(), as_json=True))
+    output = payload["runs"][0]["output"]
 
-    assert payload["output"]["text"] == text
-    assert "presentation_truncated" not in payload["output"]
+    assert output["presentation_truncated"] is True
+    assert output["presentation_omitted_bytes"] > 0
+    assert output["captured_bytes"] <= render.MAX_OUTPUT_BYTES_PER_RUN
+    assert "copout omitted" in output["text"]
 
 
 def test_history_utf8_truncation_does_not_split_codepoints() -> None:
     text = "🍄" * 40000
-    history = record.build_history_from_entries([HistoryEntry("id", "mushrooms", output=text)])
+    history = record.build_record_from_entries([HistoryEntry("id", "mushrooms", output=text)])
     payload = json.loads(render.render(history, as_json=True))
     output = payload["runs"][0]["output"]
 
@@ -292,7 +295,7 @@ def test_history_utf8_truncation_does_not_split_codepoints() -> None:
 
 def test_xml_reports_presentation_truncation_separately() -> None:
     text = "x" * (render.MAX_OUTPUT_BYTES_PER_RUN + 1000)
-    history = record.build_history_from_entries([HistoryEntry("id", "build", output=text)])
+    history = record.build_record_from_entries([HistoryEntry("id", "build", output=text)])
 
     output = ElementTree.fromstring(render.render(history)).find("run/output")
 

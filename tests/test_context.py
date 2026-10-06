@@ -103,7 +103,7 @@ def test_git_context_marks_state_as_observed_at_capture(monkeypatch) -> None:
 
 
 def test_xml_renders_environment_and_git_context() -> None:
-    captured = record.build_history_from_entries([HistoryEntry("1", "git status", "/repo")])
+    captured = record.build_record_from_entries([HistoryEntry("1", "git status", "/repo")])
     captured["environment"] = {
         "login_shell": "/bin/zsh",
         "os": "darwin",

@@ -12,25 +12,28 @@ runner = CliRunner()
 def _record_fixture(*, context_options=None) -> dict:
     del context_options
     return {
-        "version": 7,
-        "scope": "command",
+        "version": 8,
         "source": "atuin",
         "captured_at": "2026-10-01T09:30:00-04:00",
-        "history_id": "abc",
-        "command": "echo hi",
-        "result": {"status": 0},
-        "output": {
-            "state": "captured",
-            "error": None,
-            "source": "atuin-pty-proxy",
-            "text": "hi\n",
-            "captured_bytes": 3,
-            "truncated": False,
-            "observed_bytes": 3,
-            "total_bytes": 3,
-        },
-        "context": {"cwd": "/tmp"},
-        "timing": {"duration": 0.01},
+        "runs": [
+            {
+                "history_id": "abc",
+                "command": "echo hi",
+                "result": {"status": 0},
+                "output": {
+                    "state": "captured",
+                    "error": None,
+                    "source": "atuin-pty-proxy",
+                    "text": "hi\n",
+                    "captured_bytes": 3,
+                    "truncated": False,
+                    "observed_bytes": 3,
+                    "total_bytes": 3,
+                },
+                "context": {"cwd": "/tmp"},
+                "timing": {"duration": 0.01},
+            }
+        ],
     }
 
 
@@ -308,7 +311,7 @@ def test_print_writes_semantic_result_to_stdout(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert result.stderr == ""
-    assert result.stdout.startswith('<copout version="7"')
+    assert result.stdout.startswith('<copout version="8"')
     assert 'source="atuin"' not in result.stdout
     assert "<![CDATA[echo hi]]>" in result.stdout
 
@@ -332,7 +335,13 @@ def test_pretty_attributes_is_opt_in(monkeypatch) -> None:
     result = runner.invoke(cli.app, ["--print", "--pretty-attributes", "--last", "1"])
 
     assert result.exit_code == 0, result.stderr
-    assert '<run\n    status="0"\n    cwd="/tmp"\n    duration_ms="10">' in result.stdout
+    assert (
+        "<run\n"
+        '    history_id="abc"\n'
+        '    status="0"\n'
+        '    cwd="/tmp"\n'
+        '    duration_ms="10">' in result.stdout
+    )
 
 
 def test_json_print_emits_valid_json(monkeypatch) -> None:
@@ -342,7 +351,8 @@ def test_json_print_emits_valid_json(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert '"history_id": "abc"' in result.stdout
-    assert '"scope": "command"' in result.stdout
+    assert '"runs": [' in result.stdout
+    assert '"scope"' not in result.stdout
 
 
 def test_last_rejects_zero() -> None:

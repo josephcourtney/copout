@@ -180,7 +180,7 @@ def test_command_copies_to_helper(command_env: CommandEnvironment) -> None:
     assert result.returncode == 0, result.stderr
     assert result.stdout == result.stderr == ""
     copied = command_env.clipboard.read_text()
-    assert copied.startswith('<copout version="7"')
+    assert copied.startswith('<copout version="8"')
     assert "<![CDATA[héllo]]>" in copied
     assert "captured_bytes" not in copied
     assert 'source="atuin"' not in copied
