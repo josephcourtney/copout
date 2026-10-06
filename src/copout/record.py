@@ -7,7 +7,7 @@ from . import context as context_capture
 from .atuin import AtuinError, HistoryEntry, recent_entries
 from .config import ContextOptions
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 OutputState = Literal["captured", "unavailable"]
 OutputSource = Literal["atuin-pty-proxy", "atuin-history-only"]
@@ -57,32 +57,12 @@ class CaptureMetadata(TypedDict):
     environment: NotRequired[context_capture.EnvironmentContext]
 
 
-class CommandRecord(RunRecord):
+class CopoutRecord(TypedDict):
     version: int
-    scope: Literal["command"]
     source: Literal["atuin"]
     captured_at: str
-    environment: NotRequired[context_capture.EnvironmentContext]
-
-
-class HistorySummary(TypedDict):
-    selected: int
-    requested: int
-    failed_only: bool
-    outputs_available: int
-
-
-class HistoryRecord(TypedDict):
-    version: int
-    scope: Literal["history"]
-    source: Literal["atuin"]
     runs: list[RunRecord]
-    history: HistorySummary
-    captured_at: str
     environment: NotRequired[context_capture.EnvironmentContext]
-
-
-type CopoutRecord = CommandRecord | HistoryRecord
 
 
 def _metadata(context_options: ContextOptions | None = None) -> CaptureMetadata:
@@ -136,27 +116,15 @@ def _git_context(
     return context_capture.capture_git_context(entry.cwd, options)
 
 
-def build_record(*, context_options: ContextOptions | None = None) -> CommandRecord:
-    entries = recent_entries(1)
-    if not entries:
-        raise AtuinError("no previous non-copout command found in the current Atuin session")
-
-    entry = entries[0]
-    return {
-        **_entry_record(entry, _git_context(entry, context_options)),
-        **_metadata(context_options),
-        "scope": "command",
-    }
-
-
-def build_history_from_entries(
+def build_record_from_entries(
     entries: list[HistoryEntry],
     *,
-    requested: int | None = None,
-    failed_only: bool = False,
     context_options: ContextOptions | None = None,
-) -> HistoryRecord:
-    """Build a chronological multi-run record from already selected entries."""
+) -> CopoutRecord:
+    """Build one schema-v8 capture envelope from chronological entries."""
+    if not entries:
+        raise ValueError("a Copout record requires at least one run")
+
     git_by_cwd: dict[str, context_capture.GitContext | None] = {}
     runs: list[RunRecord] = []
     for entry in entries:
@@ -166,15 +134,15 @@ def build_history_from_entries(
 
     return {
         **_metadata(context_options),
-        "scope": "history",
         "runs": runs,
-        "history": {
-            "selected": len(runs),
-            "requested": len(runs) if requested is None else requested,
-            "failed_only": failed_only,
-            "outputs_available": sum(run["output"]["state"] == "captured" for run in runs),
-        },
     }
+
+
+def build_record(*, context_options: ContextOptions | None = None) -> CopoutRecord:
+    entries = recent_entries(1)
+    if not entries:
+        raise AtuinError("no previous non-copout command found in the current Atuin session")
+    return build_record_from_entries(entries, context_options=context_options)
 
 
 def build_history(
@@ -182,15 +150,10 @@ def build_history(
     count: int,
     failed_only: bool = False,
     context_options: ContextOptions | None = None,
-) -> HistoryRecord:
+) -> CopoutRecord:
     entries = recent_entries(count, failed_only=failed_only)
     if not entries:
         qualifier = "failed " if failed_only else ""
         raise AtuinError(f"no {qualifier}non-copout commands found in the current Atuin session")
     entries.reverse()
-    return build_history_from_entries(
-        entries,
-        requested=count,
-        failed_only=failed_only,
-        context_options=context_options,
-    )
+    return build_record_from_entries(entries, context_options=context_options)
