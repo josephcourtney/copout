@@ -247,7 +247,7 @@ def run_pick(
 
     try:
         hydrated = atuin.hydrate_outputs(selected)
-        captured = record.build_history_from_entries(
+        captured = record.build_record_from_entries(
             hydrated,
             context_options=context_options,
         )
