@@ -83,11 +83,11 @@ Copout retrieves persisted chronological history with `atuin history list --sess
 
 Copout removes ASCII whitespace only from the end of complete captured output. This eliminates terminal-cell padding and final blank rows while preserving internal indentation, spacing, blank lines, and any SGR styling that survives Atuin's capture.
 
-For multi-run history records, presented output is bounded to 128 KiB per run and 512 KiB across all runs. Oversized output preserves both its beginning and end with an explicit omission marker. JSON adds `presentation_truncated` and `presentation_omitted_bytes` when Copout shortens an output, while XML adds the same attributes to `<output>`. This presentation truncation is separate from any truncation reported by Atuin. The legacy single-command `CommandRecord` path used by `-n 1` is not subject to the multi-run presentation budget; selector and picker output is represented as selected history and uses the history budget even when only one entry is chosen.
+Presented output is bounded to 128 KiB per run and 512 KiB across all runs, including captures containing only one run. Oversized output preserves both its beginning and end with an explicit omission marker. JSON adds `presentation_truncated` and `presentation_omitted_bytes` when Copout shortens an output, while XML adds the same attributes to `<output>`. This presentation truncation is separate from any truncation reported by Atuin. Because schema v8 uses one universal envelope, the presentation rules no longer depend on whether a command was selected with `-n 1`, a positional selector, or the TUI.
 
 ## Execution context
 
-Schema version 7 can add compact environment and repository context. The defaults are intended to provide useful development context without automatically exposing hostnames, remotes, arbitrary environment variables, or large diffs.
+Schema version 8 can add compact environment and repository context. The defaults are intended to provide useful development context without automatically exposing hostnames, remotes, arbitrary environment variables, or large diffs.
 
 Enabled by default:
 
@@ -129,18 +129,20 @@ env = []
 executables = []
 ```
 
-## Output format (schema version 7)
+## Output format (schema version 8)
 
-Copout's internal record retains capture metadata. JSON exposes that structured record after normalizing `output.text` by removing terminal-end ASCII whitespace. `captured_bytes` is recomputed from the presented text. `observed_bytes` is the upstream count of bytes observed before rendering when the backend supplies it. `total_bytes` is reserved for a true complete-output byte count and is left unknown when the backend cannot supply that fact. Atuin's current command-output RPC reports the size of its stored rendered output rather than the complete pre-truncation output size, so Copout does not map that value to `total_bytes`.
+Schema v8 has one record shape for every capture. The root contains capture metadata plus a non-empty `runs` array; a single selected command is represented by a one-element `runs` array, exactly like one run within a larger selection. The schema no longer has `scope`, distinct command/history record types, or the old `history` summary object. Query intent is not encoded into the result shape.
+
+Copout's internal record retains capture metadata. JSON exposes that structured record after normalizing each `output.text` by removing terminal-end ASCII whitespace. `captured_bytes` is recomputed from the presented text. `observed_bytes` is the upstream count of bytes observed before rendering when the backend supplies it. `total_bytes` is reserved for a true complete-output byte count and is left unknown when the backend cannot supply that fact. Atuin's current command-output RPC reports the size of its stored rendered output rather than the complete pre-truncation output size, so Copout does not map that value to `total_bytes`.
 
 A typical XML history result can look like:
 
 ```xml
-<copout version="7" captured_at="2026-10-01T09:31:00-04:00">
+<copout version="8" captured_at="2026-10-01T09:31:00-04:00">
   <environment login_shell="/bin/zsh" os="macos" arch="arm64" session_id="...">
     <python executable="/repo/.venv/bin/python" version="3.14.0" implementation="cpython" environment="/repo/.venv"/>
   </environment>
-  <run status="0" cwd="/repo" duration_ms="102" recorded_at="2026-10-01 09:30:59">
+  <run history_id="..." status="0" cwd="/repo" duration_ms="102" recorded_at="2026-10-01 09:30:59">
     <git observed_at_capture="true" root="/repo" branch="main" detached="false" commit="abc123..." dirty="false"/>
     <command><![CDATA[printf 'hello\n']]></command>
     <output><![CDATA[hello]]></output>
@@ -148,7 +150,7 @@ A typical XML history result can look like:
 </copout>
 ```
 
-History XML has one `<run>` per selected command and does not repeat that count as a root attribute. Run durations are canonical integer milliseconds in `duration_ms`. `captured_at` records when Copout built the record, while `recorded_at` is the timestamp supplied by Atuin for the command. Structured optional context uses child elements: extended Git context may add worktree attributes plus `<changed-file>` and `<diff>`, while explicitly requested environment variables and executable resolutions appear as `<variable>` and `<executable>` children of `<environment>`.
+XML has one `<run>` per selected command, including for a one-command capture, and every run carries its Atuin `history_id`. It does not repeat the run count as a root attribute. Run durations are canonical integer milliseconds in `duration_ms`. `captured_at` records when Copout built the record, while `recorded_at` is the timestamp supplied by Atuin for the command. Structured optional context uses child elements: extended Git context may add worktree attributes plus `<changed-file>` and `<diff>`, while explicitly requested environment variables and executable resolutions appear as `<variable>` and `<executable>` children of `<environment>`.
 
 ### Text encoding contract
 
@@ -176,7 +178,7 @@ Extended attributes appear only when they explain an exceptional or incomplete c
 - `total_bytes`: true complete-output byte size, only when a backend can supply that fact independently. Copout does not infer it, and the current Atuin RPC's stored-rendered-output byte count is not used for this field.
 - `exit_capture_complete`: whether the capture mechanism reports that capture remained active through process termination. Copout emits it only when the upstream API provides it and extended metadata is otherwise relevant; absence does not imply `true`.
 
-Copout also retains `presentation_truncated` and `presentation_omitted_bytes` when Copout itself shortens a multi-run output to fit its presentation budget. That condition is independent of upstream `truncated`.
+Copout also retains `presentation_truncated` and `presentation_omitted_bytes` when Copout itself shortens output to fit its presentation budget. That condition is independent of upstream `truncated`.
 
 Unavailable output retains an `error` attribute when Copout knows why retrieval failed. Atuin-truncated output and Copout presentation truncation remain distinct.
 
