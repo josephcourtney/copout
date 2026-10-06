@@ -116,8 +116,15 @@ def _printf_probe(marker: str, *, stderr: bool = False, newline: bool = True) ->
     return f"printf '{format_string}' {_split_literal(marker)}{redirect}"
 
 
-def _child_stderr_probe(marker: str, *, stdout_to_devnull: bool = False) -> str:
+def _child_stderr_probe(
+    marker: str,
+    *,
+    stdout_to_devnull: bool = False,
+    exit_status: int | None = None,
+) -> str:
     script = f"printf '%s\\n' {_split_literal(marker)} >&2"
+    if exit_status is not None:
+        script += f"; exit {exit_status}"
     command = f"/bin/sh -c {shlex.quote(script)}"
     if stdout_to_devnull:
         command += " > /dev/null"
@@ -187,20 +194,25 @@ _BASE_STDERR_PROBES = (
     ),
     _Probe(
         "nonzero-stderr",
-        f"({_printf_probe(_STDERR_FAILURE, stderr=True)}; exit 17)",
+        _child_stderr_probe(_STDERR_FAILURE, exit_status=17),
         (_STDERR_FAILURE,),
         expected_status=17,
     ),
 )
 
+_RAPID_STDERR_COUNT = max(1, int(os.environ.get("COPOUT_STDERR_STRESS_COUNT", "16")))
 _RAPID_STDERR_PROBES = tuple(
     _Probe(
-        f"rapid-stderr-{index:02d}",
-        _printf_probe(marker, stderr=True),
+        f"rapid-stderr-{index:03d}",
+        (
+            _printf_probe(marker, stderr=True)
+            if index % 2 == 0
+            else _child_stderr_probe(marker)
+        ),
         (marker,),
     )
-    for index in range(16)
-    for marker in (f"__COPOUT_STDERR_RAPID_{index:02d}__",)
+    for index in range(_RAPID_STDERR_COUNT)
+    for marker in (f"__COPOUT_STDERR_RAPID_{index:03d}__",)
 )
 
 _STDERR_PROBES = _BASE_STDERR_PROBES + _RAPID_STDERR_PROBES
