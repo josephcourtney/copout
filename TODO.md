@@ -19,7 +19,15 @@
 - [x] Always expose selected commands through a non-empty `runs` array and include `history_id` consistently in XML.
 - [x] Apply presentation budgets uniformly to one-run and multi-run captures.
 - [x] Update renderer tests, CLI fixtures, README, changelog, and plan for schema v8.
-- [ ] Run local `just repair` and `just check` on `schema-v8-universal-envelope`, then merge only if both pass.
+- [x] Run local `just repair` and `just check` on `schema-v8-universal-envelope`, then merge only if both pass.
+
+## Stderr capture investigation
+
+- [x] Add real-shell/Atuin E2E probes for stderr-only output, child processes, direct fd 2 writes, nonzero exits, no-final-newline output, pipelines, redirected stdout, buffered bursts, mixed stdout/stderr ordering, and rapid independent commands.
+- [x] Preserve each probe's observed child-PTY transcript so failures distinguish terminal emission from Atuin/Copout capture loss.
+- [x] Make the rapid-probe count configurable through `COPOUT_STDERR_STRESS_COUNT` for targeted reproduction runs.
+- [ ] Run the new suite on the affected real environment and repeat with a substantially larger stress count.
+- [ ] If a failure reproduces, classify it as missing Atuin history, unavailable daemon output, or a sentinel present on the PTY but absent from Atuin-retrieved output before changing production code.
 
 ## Next release
 
