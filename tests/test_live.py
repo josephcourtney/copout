@@ -226,11 +226,7 @@ _RAPID_STDERR_COUNT = max(1, int(os.environ.get("COPOUT_STDERR_STRESS_COUNT", "1
 _RAPID_STDERR_PROBES = tuple(
     _Probe(
         f"rapid-stderr-{index:03d}",
-        (
-            _printf_probe(marker, stderr=True)
-            if index % 2 == 0
-            else _child_stderr_probe(marker)
-        ),
+        (_printf_probe(marker, stderr=True) if index % 2 == 0 else _child_stderr_probe(marker)),
         (marker,),
     )
     for index in range(_RAPID_STDERR_COUNT)
