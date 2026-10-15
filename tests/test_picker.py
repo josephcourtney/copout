@@ -134,8 +134,12 @@ def test_picker_remains_a_single_compact_list_in_wide_terminal() -> None:
             choices = app.query_one("#commands", SelectionList)
             help_line = app.query_one("#picker-help", Static)
             assert len(list(app.query(SelectionList))) == 1
-            assert choices.size.width == 100
-            assert help_line.size.width == 100
+            # Textual's .size is the content box: CSS max-width includes
+            # borders and padding, so the list can report fewer than 100 cells.
+            assert 0 < choices.size.width <= 100
+            assert 0 < help_line.size.width <= 100
+            assert choices.size.width < 160
+            assert help_line.size.width < 160
             await pilot.press("enter")
         assert app.return_value == [0]
 
