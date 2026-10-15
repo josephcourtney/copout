@@ -87,7 +87,7 @@ Presented output is bounded to 128 KiB per run and 512 KiB across all runs, incl
 
 ## Execution context
 
-Schema version 8 can add compact environment and repository context. The defaults are intended to provide useful development context without automatically exposing hostnames, remotes, arbitrary environment variables, or large diffs.
+Schema version 9 retains compact environment and repository context. The defaults are intended to provide useful development context without automatically exposing hostnames, remotes, arbitrary environment variables, or large diffs.
 
 Enabled by default:
 
