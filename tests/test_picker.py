@@ -118,9 +118,7 @@ def test_picker_escape_cancels() -> None:
 
 
 def test_picker_inline_size_is_selected_before_first_render() -> None:
-    small = picker.CommandPicker(
-        [HistoryEntry("2", "newest"), HistoryEntry("1", "older")]
-    )
+    small = picker.CommandPicker([HistoryEntry("2", "newest"), HistoryEntry("1", "older")])
     large = picker.CommandPicker(
         [HistoryEntry(str(index), f"command {index}") for index in range(40)]
     )
@@ -130,9 +128,7 @@ def test_picker_inline_size_is_selected_before_first_render() -> None:
 
 def test_picker_remains_a_single_compact_list_in_wide_terminal() -> None:
     async def exercise() -> None:
-        app = picker.CommandPicker(
-            [HistoryEntry("2", "newest"), HistoryEntry("1", "older")]
-        )
+        app = picker.CommandPicker([HistoryEntry("2", "newest"), HistoryEntry("1", "older")])
         async with app.run_test(size=(160, 20)) as pilot:
             await pilot.pause()
             choices = app.query_one("#commands", SelectionList)
