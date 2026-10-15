@@ -202,7 +202,7 @@ To reproduce a bounded but long terminal transcript, run `bash scripts/probe_out
 uv run python scripts/collect_evidence.py --kitty-clipboard
 ```
 
-Omit `--kitty-clipboard` if there is no Kitty selection to save. The collector skips its own shell-history entry and retrieves the most recent other eligible command via Atuin/Jerakeen. It writes one timestamped directory with `copout.json`, `copout.xml`, `copout.md`, and `summary.json`; with the optional clipboard input it also saves `kitty-selection.txt` and `kitty-vs-copout.diff`. The comparison is diagnostic, not a byte-for-byte PTY equivalence test: Kitty selection may include prompts, and Atuin collapses redrawn output.
+Omit `--kitty-clipboard` if there is no Kitty selection to save. The collector skips its own shell-history entry and retrieves the most recent other eligible command via Atuin/Jerakeen. It writes one timestamped directory with `atuin-snapshot.txt` (the unnormalized text returned by Jerakeen when available), `copout.json`, `copout.xml`, `copout.md`, and `summary.json`; with the optional clipboard input it also saves `kitty-selection.txt` and `kitty-vs-copout.diff`. The comparison is diagnostic, not a byte-for-byte PTY equivalence test: Kitty selection may include prompts, and Atuin collapses redrawn output.
 
 Use `--history-id ID` to select an exact history entry within the latest 100 entries, or `--output DIRECTORY` to control the new evidence directory. Evidence may contain sensitive terminal text; inspect it before sharing.
 
