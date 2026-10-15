@@ -1,34 +1,37 @@
 # TODO
 
-## 0.11.0 release
+## 0.12.0 release candidate (schema v9)
 
-- [x] Complete the selector-first CLI and picker stabilization work.
-- [x] Advance structured output to schema v8 with one universal `runs` envelope.
-- [x] Advance to schema v9 with explicit terminal-snapshot completeness and normalized, safe plain-text output.
-- [x] Add and stress-test real-shell stderr-capture diagnostics; no loss reproduced at 200 or 1000 rapid commands.
-- [x] Bump package and lockfile metadata to 0.11.0.
-- [x] Move the accumulated Unreleased changelog into the 0.11.0 release section.
-- [x] Synchronize README/status documentation with the implemented behavior and current known concerns.
-- [ ] Run `just repair` and final `just check` on the 0.11.0 release branch.
-- [ ] Re-run the principal real-terminal workflows: bare picker, empty-selection Enter, multi-select, redirected `-p`, explicit selectors, and non-TTY failure behavior.
-- [ ] Run `just build` and inspect the wheel/sdist.
-- [ ] Tag/publish only when explicitly requested.
+- [x] Preserve the v8 universal capture envelope while advancing the terminal-output contract to schema v9.
+- [x] Keep upstream capture incompleteness distinct from explicit Copout presentation truncation.
+- [x] Verify the 2,400-line probe evidence: Atuin retained the full snapshot; the prior 128 KiB Copout budget omitted the middle.
+- [x] Increase the presentation budgets and add golden/unit regression coverage.
+- [x] Add a collector that independently compares full Atuin snapshots, Kitty selection, and Copout's bounded presentation.
+- [x] Move terminal evidence archives out of tracked project content; ignore future local ZIP bundles.
+- [x] Choose 0.12.0 for the next candidate and align the package version, root lock metadata, README examples, and changelog.
+- [x] Add `scripts/qualify_release.sh` with a no-skipped-live-tests gate and wheel/sdist inspection.
+- [x] Document a human-observed Kitty/Atuin acceptance matrix in `docs/RELEASE_QUALIFICATION.md`.
+- [ ] Run the candidate's `bash scripts/qualify_release.sh` **on the target macOS host**. Do not infer a pass from earlier validation on an older commit.
+- [ ] Complete and record the real Kitty picker, selection, redirected output, and non-TTY acceptance steps.
+- [ ] Re-run the actual Kev workload and inspect `kitty-vs-atuin.diff` separately from `kitty-vs-copout.diff`.
+- [ ] Record build artifacts, the exact checked commit, and the results of release qualification.
+- [ ] Tag and publish **only on explicit request** after the gates pass.
 
-## Unconfirmed stderr observation
+## Follow-up hardening (not release blockers)
 
-- [x] Add real-shell/Atuin E2E probes that preserve both the child-PTY observation and Atuin/Copout result.
-- [x] Exercise stderr from shell builtins, child processes, direct fd 2 writes, buffered bursts, nonzero exits, pipelines, redirected stdout, missing final newlines, and mixed stdout/stderr.
-- [x] Run rapid independent stderr probes at counts of 200 and 1000 without reproducing loss.
-- [ ] If the behavior recurs, capture the exact command and execution context and classify the failure as missing Atuin history, unavailable daemon output, or terminal-visible data absent from Atuin-retrieved output before changing production code.
+- [ ] Validate whether tests can safely use a dedicated Atuin session identity without changing the real shell-integration lifecycle; do not assume setting one variable isolates daemon state.
+- [ ] Establish Typer compatibility against installed versions before adding a speculative upper bound; CLI integration tests protect the currently locked version.
+- [ ] Measure multi-run context-enrichment overhead against `--no-context` before optimizing.
+- [ ] Add historical context only when an authoritative upstream source provides it. Never infer historical Git state from the present.
 
-## Follow-up design decisions
+## Prior 0.11.0 development
 
-- [ ] Review whether real-shell integration tests can use a dedicated Atuin session identity to reduce side effects in normal user history without weakening coverage.
-- [ ] Consider an upper Typer compatibility bound because Copout subclasses `TyperGroup`; update the lockfile and validate locally if changed.
-- [ ] Measure context-capture subprocess cost on large multi-run selections; optimize only if measurement shows it is material.
-- [ ] Consider additional historical context only when it can come from an authoritative upstream source.
-- [ ] Keep optional context additions privacy-conservative and bounded; avoid adding persistent Copout state to support them.
+- [x] Implement selector-first CLI, stable preselection, bounded hydration, and picker stabilization.
+- [x] Adopt schema v8's universal `runs` envelope.
+- [x] Add real-shell PTY/stderr diagnostics and exercise 200- and 1000-command stress runs; no data loss reproduced under those conditions.
+- [x] Update package/lock metadata and the dated 0.11.0 changelog section.
+- [ ] If intermittent stderr loss recurs, preserve a real command, PTY observation, Atuin snapshot, and full execution context before proposing a production fix.
 
-## Previous release validation
+## Existing evidence
 
-0.10.0 release validation on 2026-10-01: `just repair` and `just check` both passed with 127 tests; the only resulting working-tree change was the expected `uv.lock` version update from 0.9.3 to 0.10.0.
+Earlier local `just fix` and `just check` passed without changes on the merged schema-v9 PR, before this release-candidate revision. Those results are useful but **do not** qualify this candidate commit. The former 0.10.0 validation on 2026-10-01 passed with 127 tests.

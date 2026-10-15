@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## Unreleased (0.12.0 release candidate)
 
 ### Changed
 
@@ -14,6 +14,7 @@
 - Add a diagnostic coverage warning for large discrepancies between observed PTY traffic and retained rendered snapshots, without treating non-equivalent byte counts as proof of data loss.
 - Preserve the optional upstream exit-capture completeness signal through to metadata.
 - Add terminal-normalization golden tests and a reproducible Kitty/Atuin/Copout evidence collector that distinguishes full upstream fidelity comparisons from Copout's bounded presentation.
+- Add a macOS release qualification script and explicit human Kitty acceptance checklist; keep test evidence archives out of version control.
 
 
 ## 0.11.0 - 2026-10-06
