@@ -7,6 +7,7 @@ controls are interpreted where practical; missing scrollback cannot be restored.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 
 _ESCAPES = re.compile(
     r"\x1b\[([0-?]*[ -/]*)([@-~])"
@@ -17,7 +18,7 @@ _ESCAPES = re.compile(
 )
 
 
-def _csi_arg(parts: list[str], position: int = 0, default: int = 1) -> int:
+def _csi_arg(parts: Sequence[str], position: int = 0, default: int = 1) -> int:
     """Read a bounded CSI numeric argument without closing over loop state."""
     if position >= len(parts) or not parts[position].isdigit():
         return default
