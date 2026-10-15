@@ -190,7 +190,10 @@ def test_xml_round_trips_controls_and_attribute_whitespace(monkeypatch) -> None:
     assert run is not None
     assert run.attrib["cwd_encoding"] == "json-string"
     assert json.loads(run.attrib["cwd"]) == cwd
-    for name, expected in (("command", command), ("output", r"\x00\x01\x1b\ufffe\uffff" + "\n]]> café")):
+    for name, expected in (
+        ("command", command),
+        ("output", r"\x00\x01\x1b\ufffe\uffff" + "\n]]> café"),
+    ):
         element = run.find(name)
         assert element is not None
         if name == "command":
