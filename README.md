@@ -140,7 +140,7 @@ Copout's internal record retains capture metadata. In schema v9, `output.text` i
 A typical XML history result can look like:
 
 ```xml
-<copout version="8" captured_at="2026-10-01T09:31:00-04:00">
+<copout version="9" captured_at="2026-10-01T09:31:00-04:00">
   <environment login_shell="/bin/zsh" os="macos" arch="arm64" session_id="...">
     <python executable="/repo/.venv/bin/python" version="3.14.0" implementation="cpython" environment="/repo/.venv"/>
   </environment>
@@ -167,7 +167,7 @@ When an element has `encoding="json-string"`, concatenate/read its XML character
 An ordinary captured snapshot remains compact:
 
 ```xml
-<output><![CDATA[hello]]></output>
+<output completeness="unknown"><![CDATA[hello]]></output>
 ```
 
 Capture completeness is explicit. Other extended attributes appear when they explain an exceptional capture or presentation limit. Supported attributes are:
@@ -208,7 +208,7 @@ Use `--history-id ID` to select an exact history entry within the latest 100 ent
 
 ## Testing
 
-Run `just check` for non-mutating lint, formatting, typing, and the test suite. `just repair` syncs dependencies, applies formatting and safe Ruff fixes, then runs type checking and tests without redundantly rerunning the Ruff validation passes. Add `--unsafe-fixes` to `just repair` or `just lint` to enable Ruff's unsafe fixes.
+Run `just check` for non-mutating lint, formatting, typing, and the test suite. For the 0.12.0 release candidate, use `bash scripts/qualify_release.sh` on macOS and complete the real Kitty workflows in [the release qualification checklist](docs/RELEASE_QUALIFICATION.md) before tagging. `just repair` syncs dependencies, applies formatting and safe Ruff fixes, then runs type checking and tests without redundantly rerunning the Ruff validation passes. Add `--unsafe-fixes` to `just repair` or `just lint` to enable Ruff's unsafe fixes.
 
 Command tests execute the installed `copout` launcher and module entry point in subprocesses with a controlled Atuin executable, Jerakeen client, clipboard helper, and isolated config directory. They cover root selector dispatch, direct and preselected selection, normalized output, unavailable output, service errors, diagnostics, clipboard delivery, context configuration, rendering, and selector window expansion without modifying the user's clipboard or history. The inline picker has headless Textual interaction tests for arrow and Vim navigation, multi-selection, confirmation, preselection, and cancellation.
 
