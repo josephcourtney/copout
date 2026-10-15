@@ -44,10 +44,15 @@ def main() -> None:
     if not matches:
         parser.error("target command not found in the current Atuin session")
     position, selected = matches[0]
+    upstream = atuin.hydrate_outputs([selected])[0]
     out = args.output or Path(
         f"copout-evidence-{datetime.now().astimezone():%Y%m%d-%H%M%S}"
     )
     out.mkdir(parents=True, exist_ok=False)
+    if upstream.output is not None:
+        (out / "atuin-snapshot.txt").write_text(
+            upstream.output, encoding="utf-8", errors="surrogatepass"
+        )
 
     def capture_cli(*flags: str) -> str:
         return subprocess.run(
@@ -77,6 +82,18 @@ def main() -> None:
         "cwd": selected.cwd,
         "status": selected.exit_status,
         "duration_seconds": selected.duration,
+        "upstream": {
+            "available": upstream.output is not None,
+            "snapshot_bytes": (
+                len(upstream.output.encode("utf-8", errors="surrogatepass"))
+                if upstream.output is not None
+                else None
+            ),
+            "truncated": upstream.output_truncated,
+            "observed_bytes": upstream.output_observed_bytes,
+            "exit_capture_complete": upstream.output_exit_capture_complete,
+            "error": upstream.output_error,
+        },
         "marker_presence": {
             marker: marker in capture["output"]["text"]
             for marker in (
