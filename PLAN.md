@@ -4,7 +4,7 @@
 
 Copout is a small, invocation-driven adapter around Atuin. Atuin owns persisted command history, session identity, daemon lifecycle, and ephemeral rendered PTY snapshots. Jerakeen supplies the public Python interface to the daemon. Copout selects recent records, adds bounded read-only context, renders safe text in XML/JSON/Markdown, and copies or prints the results.
 
-The **0.12.0 release candidate** incorporates the already merged schema-v9 work. This is **not** a tagged or published release. The package and lockfile version are 0.12.0, while the changelog retains those changes under *Unreleased* pending the macOS acceptance gate.
+The **0.12.0 release candidate** incorporates the merged schema-v9 and optional hardening work. It passed macOS release qualification on October 15 at commit `7ea18711ab73fbca4eaea25694768d43ec68ea79`. This is **not** a tagged or published release; the changelog remains under *Unreleased* until an explicitly authorized release.
 
 ## Completed implementation
 
@@ -20,17 +20,17 @@ The **0.12.0 release candidate** incorporates the already merged schema-v9 work.
 
 The uploaded Oct 15 diagnostic probe confirmed all 2,400 lines and both markers were retained upstream by Atuin; Copout's earlier 128 KiB presentation budget omitted the middle. The revised 256 KiB limit fits that probe. This conclusion does not certify completeness for arbitrary redrawing/interactive sessions.
 
-## Release qualification remaining
+## Release qualification
 
-Use `docs/RELEASE_QUALIFICATION.md` as the acceptance record. The automated gate is `bash scripts/qualify_release.sh` and must run in the real macOS environment. Then exercise picker focus/selection/clipboard, redirected `-p`, explicit selectors, non-TTY failure, and the original Kev workload in Kitty. Record what was actually observed. The package build, live checks, and source-distro inspection cannot be certified merely by a green prior unit test suite.
+On October 15, the user completed the manual Kitty acceptance matrix and ran `bash scripts/qualify_release.sh` on macOS against `7ea1871`. Ruff, `ty`, 192 tests, the separate 14-test live suite, headless checks, and wheel/sdist inspections passed. The two build artifacts are `dist/copout-0.12.0-py3-none-any.whl` and `dist/copout-0.12.0.tar.gz`. See `docs/RELEASE_QUALIFICATION.md` for the acceptance record.
 
-Do not tag, publish, or mark the release qualified until all gates are observed. The release script deliberately does not release.
+The candidate is qualified. No release tag or publication has been requested or performed. The release script deliberately does not release.
 
 ## Optional hardening
 
 All four safeguards are **implemented** as tests or opt-in diagnostics, not as unmeasured production changes. See `docs/HARDENING.md`.
 
-1. **Test-session isolation:** the native zsh/Atuin live harness resets session/proxy inheritance in the forked child, obtains a fresh shell identity, and verifies that Copout's result uses it. Full macOS validation is still required; this scopes session queries, not global Atuin persistence.
+1. **Test-session isolation:** the native zsh/Atuin live harness resets session/proxy inheritance in the forked child, obtains a fresh shell identity, and verifies that Copout's result uses it. The live suite passed on macOS; this scopes session queries, not global Atuin persistence.
 2. **Typer compatibility:** `just typer-compat` constructs temporary environments around the 0.26.0 vendored-Click boundary, running the CLI test matrix. Do not add speculative dependency bounds before reviewing actual results.
 3. **Context cost:** `just benchmark-context` alternates matched, same-history-ID runs with and without read-only context and reports robust aggregate latency comparisons. Optimize only if the measured delta justifies it.
 4. **Historical provenance:** regression tests require historical Atuin timestamps and statuses to remain distinct from Git state observed at capture. Introduce new historical fields only from authoritative upstream evidence.

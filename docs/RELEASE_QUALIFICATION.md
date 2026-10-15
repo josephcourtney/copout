@@ -61,9 +61,22 @@ The collector creates potentially sensitive local diagnostic files. They must no
 
 The additional development checks are described in [HARDENING.md](HARDENING.md). Run `just typer-compat` to test the CLI against isolated Typer versions and `just benchmark-context` to obtain paired, stable-selection context-overhead timings. The live PTY tests now explicitly reject reuse of the parent Atuin session. These diagnostics do not publish or tag and are not substitutes for the release gate.
 
+## Observed results — October 15, 2026
+
+The user ran `bash scripts/qualify_release.sh` on macOS from a clean working tree at commit `7ea18711ab73fbca4eaea25694768d43ec68ea79` (`main`). The script completed with exit status 0:
+
+- `uv sync --locked` completed; Ruff lint, formatting and `ty` passed.
+- Full pytest run: **192 passed** in 22.94 seconds.
+- Explicit macOS real-shell suite: **14 passed** in 6.64 seconds; no reported skips.
+- Headless check verified non-TTY rejection and explicit selector success.
+- Built and inspected `dist/copout-0.12.0.tar.gz` and `dist/copout-0.12.0-py3-none-any.whl`.
+- The `uv build` command warned that the declared `uv-build>=0.11,<0.12` backend range does not contain the invoking uv CLI version 0.12.23, but returned success and built both artifacts; the scripted checks passed.
+
+The user separately reported the full manual Kitty interaction and real-workload checks passing on October 15. Those checks were not independently rerun as part of this automated build log.
+
 ## Release decision
 
-Record the completed gates and their command output before tagging or publishing. Update `CHANGELOG.md` from candidate/unreleased to a dated release section only after those gates pass. A release tag and publication are separate, explicit actions; the script deliberately performs neither.
+The 0.12.0 implementation has passed the required automated and user-reported manual gates. Keep `CHANGELOG.md` under *Unreleased* until an explicitly requested release finalizes the dated entry. A release tag and publication are separate, explicit actions; the script deliberately performs neither.
 
 ## Optional hardening disposition
 
