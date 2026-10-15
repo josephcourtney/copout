@@ -196,7 +196,7 @@ If output retrieval fails, the output record's `error` field (or XML attribute) 
 
 ## Collecting capture-fidelity evidence
 
-Run the target command in a Kitty shell with Atuin output capture active. Optionally select its visible output in Kitty and copy it to the clipboard. Then, from this repository in the same Atuin session:
+To reproduce a bounded but long terminal transcript, run `bash scripts/probe_output.sh` in a Kitty shell with Atuin output capture active. Alternatively, run the command you actually want to diagnose. Optionally select its visible output in Kitty and copy it to the clipboard. Then, from this repository in the same Atuin session:
 
 ```console
 uv run python scripts/collect_evidence.py --kitty-clipboard
