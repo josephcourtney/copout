@@ -16,6 +16,7 @@ from datetime import datetime
 from pathlib import Path
 
 from copout import atuin
+from copout.terminal import plain_terminal_text
 
 
 def main() -> None:
@@ -113,16 +114,29 @@ def main() -> None:
             ["pbpaste"], check=True, capture_output=True, text=True
         ).stdout
         (out / "kitty-selection.txt").write_text(kitty, encoding="utf-8")
-        differences = difflib.unified_diff(
-            kitty.splitlines(keepends=True),
-            capture["output"]["text"].splitlines(keepends=True),
-            fromfile="Kitty visible selection (may contain prompt)",
-            tofile="Atuin rendered snapshot (Copout plain text)",
-        )
-        (out / "kitty-vs-copout.diff").write_text(
-            "".join(differences), encoding="utf-8"
-        )
+        def save_diff(filename: str, label: str, expected: str) -> None:
+            differences = difflib.unified_diff(
+                kitty.splitlines(keepends=True),
+                expected.splitlines(keepends=True),
+                fromfile="Kitty visible selection (may include prompts)",
+                tofile=label,
+            )
+            (out / filename).write_text("".join(differences), encoding="utf-8")
+
         summary["kitty_selection_bytes"] = len(kitty.encode("utf-8"))
+        if upstream.output is not None:
+            normalized = plain_terminal_text(upstream.output)
+            (out / "atuin-normalized.txt").write_text(normalized, encoding="utf-8")
+            save_diff("kitty-vs-atuin.diff", "Full normalized Atuin snapshot", normalized)
+            summary["kitty_matches_normalized_atuin"] = kitty == normalized
+            summary["copout_matches_normalized_atuin"] = (
+                capture["output"]["text"] == normalized
+            )
+        save_diff(
+            "kitty-vs-copout.diff",
+            "Copout presentation (may be explicitly truncated)",
+            capture["output"]["text"],
+        )
     (out / "summary.json").write_text(
         json.dumps(summary, indent=2) + "\n", encoding="utf-8"
     )
