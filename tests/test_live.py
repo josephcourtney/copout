@@ -312,7 +312,8 @@ def _run_probes_in_atuin_shell(output_path: Path, probes: tuple[_Probe, ...]) ->
         query_count = max(50, len(probes) * 3)
         _send(
             fd,
-            f"'{quoted_launcher}' --print --json --last {query_count} > '{quoted_output}'; "
+            f"'{quoted_launcher}' --print --json --context --system-context "
+            f"--last {query_count} > '{quoted_output}'; "
             + _marker_command("__COPOUT_QUERY_", "DONE__"),
         )
         _read_until(fd, _QUERY_DONE)
@@ -459,7 +460,7 @@ def test_live_clipboard_delivery_does_not_fork_after_grpc(tmp_path: Path) -> Non
     assert result.stderr == ""
 
 
-def test_atun_shell_session_reset_is_scoped(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_atuin_shell_session_reset_is_scoped(monkeypatch: pytest.MonkeyPatch) -> None:
     keys = (
         "ATUIN_SESSION",
         "ATUIN_SHLVL",
