@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import json
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -109,11 +110,18 @@ def main() -> None:
             if key != "text"
         },
     }
+    if upstream.output is not None:
+        probe_pattern = r"(?m)^probe (\\d{4})\\b"
+        summary["probe_line_counts"] = {
+            "atuin": len(re.findall(probe_pattern, upstream.output)),
+            "copout": len(re.findall(probe_pattern, capture["output"]["text"])),
+        }
     if args.kitty_clipboard:
         kitty = subprocess.run(
             ["pbpaste"], check=True, capture_output=True, text=True
         ).stdout
         (out / "kitty-selection.txt").write_text(kitty, encoding="utf-8")
+
         def save_diff(filename: str, label: str, expected: str) -> None:
             differences = difflib.unified_diff(
                 kitty.splitlines(keepends=True),
