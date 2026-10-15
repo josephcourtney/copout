@@ -9,8 +9,8 @@ from .context import EnvironmentContext, GitContext
 from .record import CopoutRecord, OutputRecord, RunRecord
 from .terminal import plain_terminal_text
 
-MAX_OUTPUT_BYTES_PER_RUN = 128 * 1024
-MAX_OUTPUT_BYTES_TOTAL = 512 * 1024
+MAX_OUTPUT_BYTES_PER_RUN = 256 * 1024
+MAX_OUTPUT_BYTES_TOTAL = 1024 * 1024
 
 
 def _encoded_text(text: str, *, attribute: bool = False) -> tuple[str, bool]:
