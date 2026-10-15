@@ -89,13 +89,12 @@ def _entry_record(entry: HistoryEntry, git: context_capture.GitContext | None = 
     captured_bytes = len(text.encode("utf-8", errors="surrogatepass"))
     truncated = entry.output_truncated if captured else None
     exit_complete = entry.output_exit_capture_complete if captured else None
-    completeness: OutputCompleteness = (
-        "unavailable"
-        if not captured
-        else "incomplete"
-        if truncated is True or exit_complete is False
-        else "unknown"
-    )
+    if not captured:
+        completeness: OutputCompleteness = "unavailable"
+    elif truncated is True or exit_complete is False:
+        completeness = "incomplete"
+    else:
+        completeness = "unknown"
     output: OutputRecord = {
         "state": "captured" if captured else "unavailable",
         "error": entry.output_error,
@@ -114,8 +113,10 @@ def _entry_record(entry: HistoryEntry, git: context_capture.GitContext | None = 
     # discrepancy is nevertheless useful evidence of a possibly incomplete
     # terminal-rendered snapshot (rather than a complete transcript).
     observed = entry.output_observed_bytes if captured else None
-    if observed is not None and observed - captured_bytes >= 65536 and observed >= 8 * max(
-        captured_bytes, 1
+    if (
+        observed is not None
+        and observed - captured_bytes >= 65536
+        and observed >= 8 * max(captured_bytes, 1)
     ):
         output["coverage_warning"] = "rendered-snapshot-much-smaller-than-pty-traffic"
 
