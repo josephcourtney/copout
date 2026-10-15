@@ -15,6 +15,11 @@
 
 ### Added
 
+- Isolate live zsh PTY tests from the caller's Atuin session identity and assert that Copout queries the newly initialized session.
+- Add opt-in temporary-environment Typer CLI compatibility tests across the vendored-Click boundary.
+- Add an alternating-pairs context-enrichment benchmark with stable Atuin history IDs and aggregate-only reports.
+- Add historical provenance regression coverage separating old Atuin command facts from current Git observations.
+- Add a hardening guide and `just typer-compat` / `just benchmark-context` recipes.
 - Add a diagnostic coverage warning for large discrepancies between observed PTY traffic and retained rendered snapshots, without treating non-equivalent byte counts as proof of data loss.
 - Preserve the optional upstream exit-capture completeness signal through to metadata.
 - Add terminal-normalization golden tests and a reproducible Kitty/Atuin/Copout evidence collector that distinguishes full upstream fidelity comparisons from Copout's bounded presentation.
