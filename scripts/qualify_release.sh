@@ -30,9 +30,44 @@ if grep -Eq '[0-9]+ skipped' <<<"$live_output"; then
   exit 2
 fi
 
+
+# Verify headless CLI behavior against the current Atuin session.
+.venv/bin/python - <<'PY'
+import json
+import subprocess
+from pathlib import Path
+
+copout = str(Path(".venv/bin/copout").resolve())
+unbound = subprocess.run(
+    [copout, "-p"],
+    stdin=subprocess.DEVNULL,
+    capture_output=True,
+    text=True,
+    start_new_session=True,
+    check=False,
+)
+if unbound.returncode == 0:
+    raise SystemExit("Bare picker unexpectedly succeeded without a controlling TTY")
+
+selected = subprocess.run(
+    [copout, "1", "-p", "--json"],
+    stdin=subprocess.DEVNULL,
+    capture_output=True,
+    text=True,
+    start_new_session=True,
+    check=False,
+)
+if selected.returncode != 0:
+    raise SystemExit(f"Headless explicit selector failed: {selected.stderr}")
+payload = json.loads(selected.stdout)
+if not payload.get("runs"):
+    raise SystemExit("Headless selector returned no runs")
+print("Verified non-TTY rejection and headless explicit selection")
+PY
+
 just build
 
-python3 - <<'PY'
+.venv/bin/python - <<'PY'
 import tarfile
 import tomllib
 import zipfile
