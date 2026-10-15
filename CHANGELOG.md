@@ -2,6 +2,10 @@
 
 ## Unreleased (0.12.0 release candidate)
 
+### Fixed
+
+- Keep the inline Textual command picker compact in wide terminals and size its bounded region from the number of available entries before its first render; add geometry regression tests.
+
 ### Changed
 
 - Advance presentation schema to version 9: `captured_bytes` now measures the retrieved Atuin snapshot before normalization, and new `presented_bytes` measures output after terminal normalization and presentation budgeting.

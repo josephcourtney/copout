@@ -21,16 +21,18 @@ class CommandPicker(App[list[int] | None]):
     ENABLE_COMMAND_PALETTE = False
     CSS = """
     Screen {
+        layout: vertical;
         &:inline {
             border: none;
-            height: 60vh;
-            min-height: 8;
+            height: $copout-picker-height;
+            min-height: 5;
             max-height: 16;
         }
     }
 
     #commands {
         width: 100%;
+        max-width: 100;
         height: 1fr;
         border: round $accent;
         padding: 0 1;
@@ -39,6 +41,7 @@ class CommandPicker(App[list[int] | None]):
 
     #picker-help {
         width: 100%;
+        max-width: 100;
         height: 1;
         padding: 0 1;
         color: $text-muted;
@@ -63,9 +66,16 @@ class CommandPicker(App[list[int] | None]):
         *,
         preselected_ids: Sequence[str] = (),
     ) -> None:
-        super().__init__()
+        # Textual reads CSS variables during App initialization.
         self._entries = list(entries)
         self._preselected_ids = set(preselected_ids)
+        super().__init__()
+
+    def get_css_variables(self) -> dict[str, str]:
+        """Size the inline region before its first frame, without a resize redraw."""
+        variables = super().get_css_variables()
+        variables["copout-picker-height"] = str(min(16, max(5, len(self._entries) + 3)))
+        return variables
 
     def compose(self) -> ComposeResult:
         options = [
