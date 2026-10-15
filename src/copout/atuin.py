@@ -47,9 +47,9 @@ class HistoryEntry:
     output: str | None = None
     output_truncated: bool | None = None
     output_observed_bytes: int | None = None
+    output_exit_capture_complete: bool | None = None
     output_total_bytes: int | None = None
     output_error: str | None = None
-    output_exit_capture_complete: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,6 +208,7 @@ async def _add_outputs(entries: list[HistoryEntry]) -> list[HistoryEntry]:
                     output=output.text,
                     output_truncated=output.truncated,
                     output_observed_bytes=output.observed_bytes,
+                    output_exit_capture_complete=getattr(output, "exit_capture_complete", None),
                 )
 
         return list(await asyncio.gather(*(populate(entry) for entry in entries)))
