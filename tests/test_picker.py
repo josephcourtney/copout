@@ -114,3 +114,33 @@ def test_picker_escape_cancels() -> None:
         assert app.return_value is None
 
     asyncio.run(exercise())
+
+
+
+def test_picker_inline_size_is_selected_before_first_render() -> None:
+    small = picker.CommandPicker(
+        [HistoryEntry("2", "newest"), HistoryEntry("1", "older")]
+    )
+    large = picker.CommandPicker(
+        [HistoryEntry(str(index), f"command {index}") for index in range(40)]
+    )
+    assert small.get_css_variables()["copout-picker-height"] == "5"
+    assert large.get_css_variables()["copout-picker-height"] == "16"
+
+
+def test_picker_remains_a_single_compact_list_in_wide_terminal() -> None:
+    async def exercise() -> None:
+        app = picker.CommandPicker(
+            [HistoryEntry("2", "newest"), HistoryEntry("1", "older")]
+        )
+        async with app.run_test(size=(160, 20)) as pilot:
+            await pilot.pause()
+            choices = app.query_one("#commands", SelectionList)
+            help_line = app.query_one("#picker-help", Static)
+            assert len(list(app.query(SelectionList))) == 1
+            assert choices.size.width == 100
+            assert help_line.size.width == 100
+            await pilot.press("enter")
+        assert app.return_value == [0]
+
+    asyncio.run(exercise())
