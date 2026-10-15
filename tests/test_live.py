@@ -286,8 +286,7 @@ def _run_probes_in_atuin_shell(output_path: Path, probes: tuple[_Probe, ...]) ->
         # The split literals prevent a match against the echoed shell input.
         _send(
             fd,
-            "print -r -- '__COPOUT_SESSION_''BEGIN__'\"$ATUIN_SESSION\""
-            "'__COPOUT_SESSION_''END__'",
+            "print -r -- '__COPOUT_SESSION_''BEGIN__'\"$ATUIN_SESSION\"'__COPOUT_SESSION_''END__'",
         )
         session_output = _read_until(fd, _SESSION_END)
         session_id = _extract_shell_session(session_output, parent_session)
