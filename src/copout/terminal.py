@@ -97,9 +97,12 @@ def plain_terminal_text(text: str) -> str:
             write("\\x1b")
         else:
             value = ord(character)
-            if value < 32 or 0x7F <= value < 0xA0 or (
-                0xD800 <= value <= 0xDFFF
-            ) or (value & 0xFFFF in (0xFFFE, 0xFFFF)):
+            if (
+                value < 32
+                or 0x7F <= value < 0xA0
+                or 0xD800 <= value <= 0xDFFF
+                or (value & 0xFFFF in (0xFFFE, 0xFFFF))
+            ):
                 write(ascii(character)[1:-1])
             else:
                 write(character)
