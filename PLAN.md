@@ -6,7 +6,7 @@ Copout is a small, invocation-driven adapter around Atuin. Atuin remains the sou
 
 The 0.11.0 release candidate includes:
 
-- compact XML schema version 8 plus JSON and Markdown renderers, using one universal capture envelope with a non-empty `runs` array;
+- compact XML schema version 9 plus JSON and Markdown renderers, using one universal capture envelope with a non-empty `runs` array;
 - selector-first CLI UX: bare `copout` opens the interactive picker, while root positional selectors gather exact recent-history positions noninteractively;
 - relative TUI preselection through `--preselect` and stable Atuin record-ID preselection through `--preselect-records`;
 - bounded Textual selection with arrow and Vim-style navigation;
@@ -22,7 +22,7 @@ The 0.11.0 release candidate includes:
 
 The selector-first redesign, picker navigation and preselection, empty-selection Enter behavior, stable-ID window expansion, Copout-command filtering, bounded output hydration, and config-precedence regression coverage are complete.
 
-Schema v8 replaces the distinct command/history record shapes with one capture envelope. Every successful capture has root capture metadata plus a non-empty `runs` array. The schema removes `scope` and the old `history` summary, always carries each run's Atuin `history_id`, and applies the same presentation-budget rules regardless of selection syntax or run count.
+Schema v9 retains the v8 universal envelope, and distinguishes captured from presented bytes, with explicitly unverified terminal-snapshot completeness. Version 8 originally replaced the distinct command/history record shapes with one capture envelope. Every successful capture has root capture metadata plus a non-empty `runs` array. The schema removes `scope` and the old `history` summary, always carries each run's Atuin `history_id`, and applies the same presentation-budget rules regardless of selection syntax or run count.
 
 The reported intermittent stderr-loss behavior was investigated with real zsh + Atuin + pty-proxy tests. The suite covers shell builtins, child processes, direct fd 2 writes, buffered bursts, nonzero exits, pipelines, redirected stdout, missing final newlines, mixed stdout/stderr ordering, and rapid independent commands. No loss reproduced in the normal suite, a 200-command stress run, or a 1000-command stress run. The diagnostic tests remain as regression/reproduction coverage; no production capture change is justified without a concrete failing case.
 
