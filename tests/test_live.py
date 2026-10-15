@@ -457,3 +457,30 @@ def test_live_clipboard_delivery_does_not_fork_after_grpc(tmp_path: Path) -> Non
     assert result.returncode == 0, result.stderr
     assert result.stdout == ""
     assert result.stderr == ""
+
+
+def test_atun_shell_session_reset_is_scoped(monkeypatch: pytest.MonkeyPatch) -> None:
+    keys = (
+        "ATUIN_SESSION",
+        "ATUIN_SHLVL",
+        "ATUIN_HISTORY_ID",
+        "ATUIN_PTY_PROXY_ACTIVE",
+        "ATUIN_PTY_PROXY_SOCKET",
+    )
+    for key in keys:
+        monkeypatch.setenv(key, "inherited")
+    monkeypatch.setenv("ATUIN_SYNC_ADDRESS", "preserve")
+
+    _clear_inherited_atuin_session()
+
+    assert all(key not in os.environ for key in keys)
+    assert os.environ["ATUIN_SYNC_ADDRESS"] == "preserve"
+
+
+def test_live_session_parser_rejects_missing_and_inherited_identity() -> None:
+    observed = b"__COPOUT_SESSION_BEGIN__fresh__COPOUT_SESSION_END__"
+    assert _extract_shell_session(observed, "parent") == "fresh"
+    with pytest.raises(AssertionError, match="reused"):
+        _extract_shell_session(observed, "fresh")
+    with pytest.raises(AssertionError, match="did not initialize"):
+        _extract_shell_session(b"no session initialized", "parent")
