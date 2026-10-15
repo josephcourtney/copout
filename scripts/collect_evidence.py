@@ -111,7 +111,7 @@ def main() -> None:
         },
     }
     if upstream.output is not None:
-        probe_pattern = r"(?m)^probe (\\d{4})\\b"
+        probe_pattern = r"(?m)^probe (\d{4})\b"
         summary["probe_line_counts"] = {
             "atuin": len(re.findall(probe_pattern, upstream.output)),
             "copout": len(re.findall(probe_pattern, capture["output"]["text"])),
