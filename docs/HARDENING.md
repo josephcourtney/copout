@@ -36,6 +36,18 @@ Requires an active Atuin session with at least the chosen number of eligible com
 
 The tool holds command output only in memory and by default prints aggregate numbers, not command strings or captured text. The optional report file contains aggregates. For meaningful comparisons, repeat on the same host and stable Atuin daemon conditions; do not treat one run as an optimization mandate.
 
+## Observed validation (October 15, 2026)
+
+On macOS, revision `db8cd6b8a01897af00c491a76b0c90cbdc5fa2eb` passed the following user-run diagnostics after `just fix` reformatted one file:
+
+- `just check`: Ruff lint and formatting, `ty`, and **192 pytest tests passed** (22.43 seconds). The test output reported no skips or failures.
+- `just typer-compat`: **PASS** at `0.24.1`, `0.26.0`, `0.27.2`, and `0.27.3`. All tested versions remain supported; no speculative upper bound is appropriate.
+- `just benchmark-context`: for ten runs, ten measured pairs, three warmup pairs, median full CLI latency was **0.187745 s without context** and **0.244418 s with context**; p90 was **0.244351 s** and **0.284711 s**, respectively. Additional median elapsed time was **0.056673 s (30.2%)**.
+
+This is one macOS benchmark session, not evidence of a regression between versions. Given the modest 57 ms absolute cost, keep the current implementation unless repeated benchmarking shows a material user-facing impact. The existing per-CWD Git inspection cache remains appropriate.
+
+The run occurred with a locally modified working tree because `just fix` reformatted one file. That formatter change must be committed or independently reproduced on the PR branch before treating the remote head as a clean green revision.
+
 ## Historical provenance
 
 Atuin supplies each run's historical timestamp, status, cwd, and duration. Copout's Git and environment enrichment inspects the **current** filesystem and process only when invoked. The Git record therefore carries `observed_at_capture=true`, while the output envelope distinguishes `captured_at` from Atuin's `recorded_at`.
