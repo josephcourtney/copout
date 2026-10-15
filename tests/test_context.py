@@ -165,17 +165,21 @@ def test_historical_commands_keep_atuin_facts_separate_from_current_git(
     monkeypatch.setattr(record.context_capture, "capture_git_context", capture_current_git)
     entries = [
         HistoryEntry(
-            "old-1", "old command", "/repository",
-            exit_status=17, timestamp="2020-01-02 03:04:05",
+            "old-1",
+            "old command",
+            "/repository",
+            exit_status=17,
+            timestamp="2020-01-02 03:04:05",
         ),
         HistoryEntry(
-            "old-2", "old command 2", "/repository",
-            exit_status=0, timestamp="2020-01-03 04:05:06",
+            "old-2",
+            "old command 2",
+            "/repository",
+            exit_status=0,
+            timestamp="2020-01-03 04:05:06",
         ),
     ]
-    captured = record.build_record_from_entries(
-        entries, context_options=ContextOptions()
-    )
+    captured = record.build_record_from_entries(entries, context_options=ContextOptions())
 
     assert inspected == ["/repository"]
     assert [run["timing"]["recorded_at"] for run in captured["runs"]] == [
