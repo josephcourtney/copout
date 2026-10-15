@@ -91,3 +91,25 @@ def test_presentation_budget_does_not_change_source_capture_size() -> None:
     assert output["presentation_truncated"] is True
     assert output["presentation_omitted_bytes"] > 0
     assert output["completeness"] == "unknown"
+
+
+def test_2400_line_probe_fits_without_presentation_truncation() -> None:
+    lines = [f"probe {index:04d} {index:072d}" for index in range(1, 2401)]
+    raw = "__COPOUT_PROBE_BEGIN__\\n" + "\\n".join(lines) + (
+        "\\n__COPOUT_STDERR__\\n\\x1b[32mcolored\\x1b[0m\\nready"
+        "\\n__COPOUT_PROBE_END__\\n"
+    )
+    payload = json.loads(
+        render.render(
+            record.build_record_from_entries(\n                [HistoryEntry("probe", "bash scripts/probe_output.sh", output=raw)]\n            ),
+            as_json=True,
+        )
+    )
+    output = payload["runs"][0]["output"]
+    assert output["captured_bytes"] > 128 * 1024
+    assert output["captured_bytes"] < render.MAX_OUTPUT_BYTES_PER_RUN
+    assert output["text"].count("probe ") == 2400
+    assert lines[0] in output["text"]
+    assert lines[-1] in output["text"]
+    assert "presentation_truncated" not in output
+    assert "presentation_omitted_bytes" not in output
