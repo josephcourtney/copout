@@ -28,10 +28,12 @@ Do not tag, publish, or mark the release qualified until all gates are observed.
 
 ## Optional hardening
 
-1. **Test-history isolation:** continue using authentic interactive shell startup until a dedicated Atuin session strategy is proven end to end. A custom `ATUIN_SESSION` value alone does not establish isolation from active daemon/session behavior.
-2. **Typer bounds:** since Copout subclasses `TyperGroup`, validate upstream compatibility against a defined set of versions before adding an artificial upper bound. The locked version is covered by the current CLI tests.
-3. **Context cost:** benchmark matched multi-run queries with context enabled and `--no-context` after warming output hydration; optimize only with reproducible measurements.
-4. **Historical provenance:** only use authoritative upstream historical context. Do not present present-day Git/environment observations as historical state.
+All four safeguards are **implemented** as tests or opt-in diagnostics, not as unmeasured production changes. See `docs/HARDENING.md`.
+
+1. **Test-session isolation:** the native zsh/Atuin live harness resets session/proxy inheritance in the forked child, obtains a fresh shell identity, and verifies that Copout's result uses it. Full macOS validation is still required; this scopes session queries, not global Atuin persistence.
+2. **Typer compatibility:** `just typer-compat` constructs temporary environments around the 0.26.0 vendored-Click boundary, running the CLI test matrix. Do not add speculative dependency bounds before reviewing actual results.
+3. **Context cost:** `just benchmark-context` alternates matched, same-history-ID runs with and without read-only context and reports robust aggregate latency comparisons. Optimize only if the measured delta justifies it.
+4. **Historical provenance:** regression tests require historical Atuin timestamps and statuses to remain distinct from Git state observed at capture. Introduce new historical fields only from authoritative upstream evidence.
 
 ## Product boundary
 
