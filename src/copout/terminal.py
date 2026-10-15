@@ -1,12 +1,15 @@
-"""Plain-text rendering for Atuin terminal snapshots."""
+"""Normalize retained terminal snapshots into safe, readable text.
+
+Atuin supplies a terminal rendering, not a complete PTY transcript. Cursor
+controls are interpreted where practical; missing scrollback cannot be restored.
+"""
 
 from __future__ import annotations
 
 import re
 
-# Strip ANSI CSI, OSC, DCS, and the remaining common ESC sequences.
-_CONTROL_SEQUENCE = re.compile(
-    r"\x1b\[[0-?]*[ -/]*[@-~]"
+_ESCAPES = re.compile(
+    r"\x1b\[([0-?]*[ -/]*)([@-~])"
     r"|\x1b\][^\x1b\x07]*(?:\x07|\x1b\\)"
     r"|\x1b[P^_X].*?\x1b\\"
     r"|\x1b[78=>]",
@@ -15,35 +18,90 @@ _CONTROL_SEQUENCE = re.compile(
 
 
 def plain_terminal_text(text: str) -> str:
-    """Produce shareable text, interpreting carriage-return redraws.
+    """Apply common VT cursor controls and remove terminal escape sequences."""
+    rows: list[list[str]] = [[]]
+    row = column = index = 0
 
-    Atuin's snapshot is not a transcript. Earlier screen content absent from
-    that snapshot cannot be recovered here.
-    """
-    text = _CONTROL_SEQUENCE.sub("", text)
-    lines: list[str] = []
-    for source_line in text.split("\n"):
-        cells: list[str] = []
-        column = 0
-        for char in source_line:
-            if char == "\r":
-                column = 0
-            elif char == "\b":
-                column = max(column - 1, 0)
+    def ensure_row() -> None:
+        while len(rows) <= row:
+            rows.append([])
+
+    def write(characters: str) -> None:
+        nonlocal column
+        for character in characters:
+            line = rows[row]
+            if column >= len(line):
+                line.extend(" " * (column - len(line)))
+                line.append(character)
             else:
-                if char == "\t":
-                    char = " " * (8 - column % 8)
-                else:
-                    codepoint = ord(char)
-                    if codepoint < 32 or 0x7F <= codepoint < 0xA0 or (
-                        0xD800 <= codepoint <= 0xDFFF
-                    ) or (codepoint & 0xFFFF in (0xFFFE, 0xFFFF)):
-                        char = ascii(char)[1:-1]
-                for value in char:
-                    if column == len(cells):
-                        cells.append(value)
-                    else:
-                        cells[column] = value
-                    column += 1
-        lines.append("".join(cells))
-    return "\n".join(lines).rstrip(" \t\r\n")
+                line[column] = character
+            column += 1
+
+    while index < len(text):
+        match = _ESCAPES.match(text, index)
+        if match is not None:
+            params, action = match.group(1), match.group(2)
+            if action is not None:
+                parts = (params or "").split(";")
+
+                def arg(position: int = 0, default: int = 1) -> int:
+                    if position >= len(parts) or not parts[position].isdigit():
+                        return default
+                    return min(int(parts[position]), 4096)
+
+                amount = arg()
+                if action == "K":
+                    mode = arg(default=0)
+                    if mode == 0:
+                        del rows[row][column:]
+                    elif mode == 1:
+                        line = rows[row]
+                        width = min(column + 1, len(line))
+                        line[:width] = [" "] * width
+                    elif mode == 2:
+                        rows[row] = []
+                elif action == "A":
+                    row = max(0, row - amount)
+                elif action == "B":
+                    row += amount
+                    ensure_row()
+                elif action == "C":
+                    column = min(column + amount, 100_000)
+                elif action == "D":
+                    column = max(0, column - amount)
+                elif action == "G":
+                    column = amount - 1
+                elif action in ("H", "f"):
+                    row = max(0, arg() - 1)
+                    column = max(0, arg(1) - 1)
+                    ensure_row()
+                elif action == "J" and arg(default=0) == 2:
+                    rows = [[]]
+                    row = column = 0
+            index = match.end()
+            continue
+
+        character = text[index]
+        index += 1
+        if character == "\n":
+            row += 1
+            column = 0
+            ensure_row()
+        elif character == "\r":
+            column = 0
+        elif character == "\b":
+            column = max(0, column - 1)
+        elif character == "\t":
+            write(" " * (8 - column % 8))
+        elif character == "\x1b":
+            write("\\x1b")
+        else:
+            value = ord(character)
+            if value < 32 or 0x7F <= value < 0xA0 or (
+                0xD800 <= value <= 0xDFFF
+            ) or (value & 0xFFFF in (0xFFFE, 0xFFFF)):
+                write(ascii(character)[1:-1])
+            else:
+                write(character)
+
+    return "\n".join("".join(line) for line in rows).rstrip(" \t\r\n")
