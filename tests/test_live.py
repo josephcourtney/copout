@@ -4,6 +4,7 @@ import errno
 import json
 import os
 import pty
+import re
 import select
 import shlex
 import shutil
@@ -22,6 +23,8 @@ _TIMEOUT = 20.0
 _READY = b"__COPOUT_READY__"
 _PROBE_DONE = b"__COPOUT_PROBE_DONE__"
 _QUERY_DONE = b"__COPOUT_QUERY_DONE__"
+_SESSION_END = b"__COPOUT_SESSION_END__"
+_SESSION_RE = re.compile(rb"__COPOUT_SESSION_BEGIN__([0-9A-Za-z_-]+)__COPOUT_SESSION_END__")
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,6 +39,7 @@ class _Probe:
 class _ProbeSession:
     runs: list[dict[str, Any]]
     terminal_output: dict[str, bytes]
+    session_id: str
 
 
 def _require_live_shell() -> str:
@@ -237,17 +241,37 @@ _STDERR_PROBES = _BASE_STDERR_PROBES + _RAPID_STDERR_PROBES
 _PROBE_BY_NAME = {probe.name: probe for probe in _STDERR_PROBES}
 
 
+def _clear_inherited_atuin_session() -> None:
+    """Force the child shell to establish its own session via native Atuin init."""
+    for key in (
+        "ATUIN_SESSION",
+        "ATUIN_SHLVL",
+        "ATUIN_HISTORY_ID",
+        "ATUIN_PTY_PROXY_ACTIVE",
+        "ATUIN_PTY_PROXY_SOCKET",
+    ):
+        os.environ.pop(key, None)
+
+
+def _extract_shell_session(output: bytes, parent_session: str | None) -> str:
+    match = _SESSION_RE.search(output)
+    assert match is not None, "Atuin did not initialize a session in the child shell"
+    session = match.group(1).decode("ascii")
+    assert session and session != parent_session, (
+        "live test unexpectedly reused the caller's Atuin history session"
+    )
+    return session
+
+
 def _run_probes_in_atuin_shell(output_path: Path, probes: tuple[_Probe, ...]) -> _ProbeSession:
     zsh = _require_live_shell()
     launcher = Path(sysconfig.get_path("scripts")) / "copout"
+    parent_session = os.environ.get("ATUIN_SESSION")
     pid, fd = pty.fork()
     if pid == 0:
-        # pytest may itself be running under Atuin's pty-proxy. The PTY created
-        # above is a new terminal boundary, so inherited proxy markers would
-        # incorrectly tell the child shell that this new PTY is already proxied.
-        # Let the child's normal shell startup launch its own proxy instead.
-        os.environ.pop("ATUIN_PTY_PROXY_ACTIVE", None)
-        os.environ.pop("ATUIN_PTY_PROXY_SOCKET", None)
+        # Change only the forked child's environment. Native zsh integration
+        # creates a fresh identity instead of reusing the parent Atuin session.
+        _clear_inherited_atuin_session()
         os.execv(zsh, [zsh, "-il"])
 
     quoted_launcher = str(launcher).replace("'", "'\\''")
@@ -258,6 +282,15 @@ def _run_probes_in_atuin_shell(output_path: Path, probes: tuple[_Probe, ...]) ->
         # First establish that startup has completed and zsh is accepting commands.
         _send(fd, _marker_command("__COPOUT_", "READY__"))
         _read_until(fd, _READY)
+
+        # The split literals prevent a match against the echoed shell input.
+        _send(
+            fd,
+            "print -r -- '__COPOUT_SESSION_''BEGIN__'\"$ATUIN_SESSION\""
+            "'__COPOUT_SESSION_''END__'",
+        )
+        session_output = _read_until(fd, _SESSION_END)
+        session_id = _extract_shell_session(session_output, parent_session)
 
         for probe in probes:
             for marker in probe.markers:
@@ -293,7 +326,12 @@ def _run_probes_in_atuin_shell(output_path: Path, probes: tuple[_Probe, ...]) ->
         pytest.fail(f"interactive zsh exited with wait status {status}")
 
     payload = json.loads(output_path.read_text())
-    return _ProbeSession(runs=payload["runs"], terminal_output=terminal_output)
+    assert payload.get("environment", {}).get("session_id") == session_id, (
+        "Copout query did not run in the isolated child Atuin session"
+    )
+    return _ProbeSession(
+        runs=payload["runs"], terminal_output=terminal_output, session_id=session_id
+    )
 
 
 def _find_probe_run(session: _ProbeSession, probe: _Probe) -> dict[str, Any]:
