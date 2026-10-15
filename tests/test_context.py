@@ -188,10 +188,11 @@ def test_historical_commands_keep_atuin_facts_separate_from_current_git(
     ]
     assert [run["result"]["status"] for run in captured["runs"]] == [17, 0]
     for run in captured["runs"]:
-        git = run["context"]["git"]
-        assert git["observed_at_capture"] is True
-        assert git["commit"] == "current-commit"
-        assert git["branch"] == "current-branch"
+        git = run["context"].get("git")
+        assert git is not None
+        assert git.get("observed_at_capture") is True
+        assert git.get("commit") == "current-commit"
+        assert git.get("branch") == "current-branch"
     xml = ElementTree.fromstring(render.render(captured))
     for node in xml.findall("run/git"):
         assert node.attrib["observed_at_capture"] == "true"
