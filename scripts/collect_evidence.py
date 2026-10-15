@@ -31,7 +31,9 @@ def main() -> None:
 
     entries = list(enumerate(atuin.recent_history(100), start=1))
     if args.history_id:
-        matches = [(position, entry) for position, entry in entries if entry.id == args.history_id]
+        matches = [
+            (position, entry) for position, entry in entries if entry.id == args.history_id
+        ]
     else:
         # The collector may appear in preexec history; skip its own entry.
         matches = [
@@ -77,7 +79,11 @@ def main() -> None:
         "duration_seconds": selected.duration,
         "marker_presence": {
             marker: marker in capture["output"]["text"]
-            for marker in ("__COPOUT_PROBE_BEGIN__", "__COPOUT_PROBE_END__", "__COPOUT_STDERR__")
+            for marker in (
+                "__COPOUT_PROBE_BEGIN__",
+                "__COPOUT_PROBE_END__",
+                "__COPOUT_STDERR__",
+            )
         },
         "output": {
             key: value
