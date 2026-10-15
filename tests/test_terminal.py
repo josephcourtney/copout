@@ -45,7 +45,7 @@ def test_all_formats_share_safe_text_without_losing_capture_provenance() -> None
     assert payload["version"] == 9
     assert output["text"] == "SECOND"
     assert output["captured_bytes"] == raw_bytes
-    assert output["presented_bytes"] == len("SECOND".encode())
+    assert output["presented_bytes"] == len(b"SECOND")
     assert output["truncated"] is False
     assert output["completeness"] == "unknown"
     assert output["coverage_warning"] == "rendered-snapshot-much-smaller-than-pty-traffic"
@@ -70,9 +70,7 @@ def test_upstream_failure_does_not_become_successful_capture() -> None:
         output_truncated=False,
         output_exit_capture_complete=False,
     )
-    payload = json.loads(
-        render.render(record.build_record_from_entries([entry]), as_json=True)
-    )
+    payload = json.loads(render.render(record.build_record_from_entries([entry]), as_json=True))
     assert payload["runs"][0]["output"]["completeness"] == "incomplete"
     assert payload["runs"][0]["output"]["exit_capture_complete"] is False
 
@@ -95,9 +93,10 @@ def test_presentation_budget_does_not_change_source_capture_size() -> None:
 
 def test_2400_line_probe_fits_without_presentation_truncation() -> None:
     lines = [f"probe {index:04d} {index:072d}" for index in range(1, 2401)]
-    raw = "__COPOUT_PROBE_BEGIN__\n" + "\n".join(lines) + (
-        "\n__COPOUT_STDERR__\n\x1b[32mcolored\x1b[0m\nready"
-        "\n__COPOUT_PROBE_END__\n"
+    raw = (
+        "__COPOUT_PROBE_BEGIN__\n"
+        + "\n".join(lines)
+        + ("\n__COPOUT_STDERR__\n\x1b[32mcolored\x1b[0m\nready\n__COPOUT_PROBE_END__\n")
     )
     payload = json.loads(
         render.render(

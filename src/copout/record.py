@@ -14,7 +14,6 @@ OutputSource = Literal["atuin-pty-proxy", "atuin-history-only"]
 OutputCompleteness = Literal["unknown", "incomplete", "unavailable"]
 
 
-
 class ResultRecord(TypedDict):
     status: int | None
 
