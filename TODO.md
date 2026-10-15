@@ -23,7 +23,9 @@
 - [x] Implement an opt-in multi-version Typer compatibility test matrix; **run it** before revising dependency bounds.
 - [x] Implement a paired, stable-selection performance benchmark; **run it** before optimizing context capture.
 - [x] Add regression tests proving old Atuin facts remain separate from Git state observed when Copout runs; continue requiring authoritative upstream historical sources.
-- [ ] Validate the new hardening on macOS with `just check`, `just typer-compat`, and `just benchmark-context`; preserve benchmark aggregates and matrix results.
+- [x] Validate hardening on macOS: 192 pytest tests, four Typer versions, and a paired 10-command benchmark all passed October 15 (see `docs/HARDENING.md`).
+- [ ] Preserve the one-file Ruff formatting change from the local `just fix` and recheck the pushed PR head before merge.
+- [ ] Ensure the release qualification script/build artifact checks have passed on the final candidate revision before tagging.
 
 ## Prior 0.11.0 development
 
