@@ -116,7 +116,6 @@ def test_picker_escape_cancels() -> None:
     asyncio.run(exercise())
 
 
-
 def test_picker_inline_size_is_selected_before_first_render() -> None:
     small = picker.CommandPicker([HistoryEntry("2", "newest"), HistoryEntry("1", "older")])
     large = picker.CommandPicker(
