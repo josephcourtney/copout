@@ -57,6 +57,10 @@ Repeat with the **original Kev playground workload** or another real command tha
 
 The collector creates potentially sensitive local diagnostic files. They must not be committed or attached to a public issue without review.
 
+## Optional hardening diagnostics
+
+The additional development checks are described in [HARDENING.md](HARDENING.md). Run `just typer-compat` to test the CLI against isolated Typer versions and `just benchmark-context` to obtain paired, stable-selection context-overhead timings. The live PTY tests now explicitly reject reuse of the parent Atuin session. These diagnostics do not publish or tag and are not substitutes for the release gate.
+
 ## Release decision
 
 Record the completed gates and their command output before tagging or publishing. Update `CHANGELOG.md` from candidate/unreleased to a dated release section only after those gates pass. A release tag and publication are separate, explicit actions; the script deliberately performs neither.

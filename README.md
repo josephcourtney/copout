@@ -208,6 +208,9 @@ Use `--history-id ID` to select an exact history entry within the latest 100 ent
 
 ## Testing
 
+Optional developer hardening checks are documented in [docs/HARDENING.md](docs/HARDENING.md). Run `just typer-compat` to test isolated Typer versions and `just benchmark-context` to compare real multi-run latency with and without current-state enrichment. Live PTY tests assert that an Atuin session distinct from the invoking shell is initialized.
+
+
 Run `just check` for non-mutating lint, formatting, typing, and the test suite. For the 0.12.0 release candidate, use `bash scripts/qualify_release.sh` on macOS and complete the real Kitty workflows in [the release qualification checklist](docs/RELEASE_QUALIFICATION.md) before tagging. `just repair` syncs dependencies, applies formatting and safe Ruff fixes, then runs type checking and tests without redundantly rerunning the Ruff validation passes. Add `--unsafe-fixes` to `just repair` or `just lint` to enable Ruff's unsafe fixes.
 
 Command tests execute the installed `copout` launcher and module entry point in subprocesses with a controlled Atuin executable, Jerakeen client, clipboard helper, and isolated config directory. They cover root selector dispatch, direct and preselected selection, normalized output, unavailable output, service errors, diagnostics, clipboard delivery, context configuration, rendering, and selector window expansion without modifying the user's clipboard or history. The inline picker has headless Textual interaction tests for arrow and Vim navigation, multi-selection, confirmation, preselection, and cancellation.

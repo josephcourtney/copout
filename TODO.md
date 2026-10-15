@@ -12,17 +12,20 @@
 - [x] Add `scripts/qualify_release.sh` with a no-skipped-live-tests gate and wheel/sdist inspection.
 - [x] Document a human-observed Kitty/Atuin acceptance matrix in `docs/RELEASE_QUALIFICATION.md`.
 - [ ] Run the candidate's `bash scripts/qualify_release.sh` **on the target macOS host**. Do not infer a pass from earlier validation on an older commit.
-- [ ] Complete and record the real Kitty picker, selection, redirected output, and non-TTY acceptance steps.
-- [ ] Re-run the actual Kev workload and inspect `kitty-vs-atuin.diff` separately from `kitty-vs-copout.diff`.
+- [x] Complete the manual Kitty picker, selection, redirected output, and non-TTY acceptance steps (user-reported passing October 15; exact commit not recorded).
+- [x] Complete the manual real-workload fidelity checks in `docs/RELEASE_QUALIFICATION.md` (user-reported passing October 15; evidence not independently re-inspected after PR #13).
 - [ ] Record build artifacts, the exact checked commit, and the results of release qualification.
 - [ ] Tag and publish **only on explicit request** after the gates pass.
 
 ## Follow-up hardening (not release blockers)
 
-- [ ] Validate whether tests can safely use a dedicated Atuin session identity without changing the real shell-integration lifecycle; do not assume setting one variable isolates daemon state.
-- [ ] Establish Typer compatibility against installed versions before adding a speculative upper bound; CLI integration tests protect the currently locked version.
-- [ ] Measure multi-run context-enrichment overhead against `--no-context` before optimizing.
-- [ ] Add historical context only when an authoritative upstream source provides it. Never infer historical Git state from the present.
+- [x] Implement automatic fresh-session setup and identity assertions in the real zsh/Atuin PTY tests. Actual macOS lifecycle validation remains pending.
+- [x] Implement an opt-in multi-version Typer compatibility test matrix; **run it** before revising dependency bounds.
+- [x] Implement a paired, stable-selection performance benchmark; **run it** before optimizing context capture.
+- [x] Add regression tests proving old Atuin facts remain separate from Git state observed when Copout runs; continue requiring authoritative upstream historical sources.
+- [x] Validate hardening on macOS: 192 pytest tests, four Typer versions, and a paired 10-command benchmark all passed October 15 (see `docs/HARDENING.md`).
+- [ ] Preserve the one-file Ruff formatting change from the local `just fix` and recheck the pushed PR head before merge.
+- [ ] Ensure the release qualification script/build artifact checks have passed on the final candidate revision before tagging.
 
 ## Prior 0.11.0 development
 

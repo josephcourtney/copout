@@ -20,7 +20,9 @@ help:
     '  just typecheck                ty type checking' \
     '  just test                     pytest' \
     '  just check                    Run non-mutating lint, format, typecheck, and tests' \
-    '  just build                    Build wheel and sdist'
+    '  just build                    Build wheel and sdist' \
+    '  just typer-compat             Test CLI across isolated Typer versions' \
+    '  just benchmark-context        Time context capture versus --no-context'
 
 setup:
   {{UV}} sync
@@ -65,6 +67,12 @@ check:
 
 build:
   {{UV}} build
+
+typer-compat:
+  {{PYTHON}} scripts/check_typer_compatibility.py
+
+benchmark-context:
+  {{PYTHON}} scripts/benchmark_context.py
 
 clean:
   rm -rf .pytest_cache .ruff_cache .coverage htmlcov dist build

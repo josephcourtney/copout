@@ -145,3 +145,58 @@ def test_xml_renders_environment_and_git_context() -> None:
     assert git.attrib["dirty"] == "true"
     assert git.findtext("changed-file") == "src/x.py"
     assert git.findtext("diff") == "diff --git a/src/x.py b/src/x.py"
+
+
+def test_historical_commands_keep_atuin_facts_separate_from_current_git(
+    monkeypatch,
+) -> None:
+    """A historical command's date/status must not date the current Git state."""
+    inspected: list[str] = []
+
+    def capture_current_git(cwd: str, _options: ContextOptions) -> context.GitContext:
+        inspected.append(cwd)
+        return {
+            "observed_at_capture": True,
+            "root": "/repository",
+            "branch": "current-branch",
+            "commit": "current-commit",
+        }
+
+    monkeypatch.setattr(record.context_capture, "capture_git_context", capture_current_git)
+    entries = [
+        HistoryEntry(
+            "old-1",
+            "old command",
+            "/repository",
+            exit_status=17,
+            timestamp="2020-01-02 03:04:05",
+        ),
+        HistoryEntry(
+            "old-2",
+            "old command 2",
+            "/repository",
+            exit_status=0,
+            timestamp="2020-01-03 04:05:06",
+        ),
+    ]
+    captured = record.build_record_from_entries(entries, context_options=ContextOptions())
+
+    assert inspected == ["/repository"]
+    assert [run["timing"]["recorded_at"] for run in captured["runs"]] == [
+        "2020-01-02 03:04:05",
+        "2020-01-03 04:05:06",
+    ]
+    assert [run["result"]["status"] for run in captured["runs"]] == [17, 0]
+    for run in captured["runs"]:
+        git = run["context"].get("git")
+        assert git is not None
+        assert git.get("observed_at_capture") is True
+        assert git.get("commit") == "current-commit"
+        assert git.get("branch") == "current-branch"
+    xml = ElementTree.fromstring(render.render(captured))
+    for node in xml.findall("run/git"):
+        assert node.attrib["observed_at_capture"] == "true"
+    assert [run.attrib["recorded_at"] for run in xml.findall("run")] == [
+        "2020-01-02 03:04:05",
+        "2020-01-03 04:05:06",
+    ]
