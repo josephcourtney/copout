@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import statistics
 import subprocess
 import sys
@@ -22,7 +23,7 @@ def percentile(samples: list[float], fraction: float) -> float:
     if not samples:
         raise ValueError("samples cannot be empty")
     ordered = sorted(samples)
-    return ordered[max(0, min(len(ordered) - 1, int((len(ordered) - 1) * fraction)))]
+    return ordered[max(0, min(len(ordered) - 1, math.ceil(len(ordered) * fraction) - 1))]
 
 
 def measure(*, count: int, context: bool) -> tuple[float, tuple[str, ...]]:
