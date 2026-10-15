@@ -17,6 +17,13 @@ _ESCAPES = re.compile(
 )
 
 
+def _csi_arg(parts: list[str], position: int = 0, default: int = 1) -> int:
+    """Read a bounded CSI numeric argument without closing over loop state."""
+    if position >= len(parts) or not parts[position].isdigit():
+        return default
+    return min(int(parts[position]), 4096)
+
+
 def plain_terminal_text(text: str) -> str:
     """Apply common VT cursor controls and remove terminal escape sequences."""
     rows: list[list[str]] = [[]]
@@ -44,14 +51,9 @@ def plain_terminal_text(text: str) -> str:
             if action is not None:
                 parts = (params or "").split(";")
 
-                def arg(position: int = 0, default: int = 1) -> int:
-                    if position >= len(parts) or not parts[position].isdigit():
-                        return default
-                    return min(int(parts[position]), 4096)
-
-                amount = arg()
+                amount = _csi_arg(parts)
                 if action == "K":
-                    mode = arg(default=0)
+                    mode = _csi_arg(parts, default=0)
                     if mode == 0:
                         del rows[row][column:]
                     elif mode == 1:
@@ -72,10 +74,10 @@ def plain_terminal_text(text: str) -> str:
                 elif action == "G":
                     column = amount - 1
                 elif action in ("H", "f"):
-                    row = max(0, arg() - 1)
-                    column = max(0, arg(1) - 1)
+                    row = max(0, _csi_arg(parts) - 1)
+                    column = max(0, _csi_arg(parts, 1) - 1)
                     ensure_row()
-                elif action == "J" and arg(default=0) == 2:
+                elif action == "J" and _csi_arg(parts, default=0) == 2:
                     rows = [[]]
                     row = column = 0
             index = match.end()
