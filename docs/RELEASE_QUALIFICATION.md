@@ -76,7 +76,7 @@ The user separately reported the full manual Kitty interaction and real-workload
 
 ## Release decision
 
-The 0.12.0 implementation has passed the required automated and user-reported manual gates. Keep `CHANGELOG.md` under *Unreleased* until an explicitly requested release finalizes the dated entry. A release tag and publication are separate, explicit actions; the script deliberately performs neither.
+The 0.12.0 implementation has passed the required automated and user-reported manual gates. Release authorization was received October 15, and the `0.12.0` changelog entry and GitHub release notes have been finalized. The tag and published GitHub release must each be verified separately. The qualification script deliberately performs neither.
 
 ## Optional hardening disposition
 
