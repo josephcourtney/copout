@@ -11,21 +11,21 @@
 - [x] Choose 0.12.0 for the next candidate and align the package version, root lock metadata, README examples, and changelog.
 - [x] Add `scripts/qualify_release.sh` with a no-skipped-live-tests gate and wheel/sdist inspection.
 - [x] Document a human-observed Kitty/Atuin acceptance matrix in `docs/RELEASE_QUALIFICATION.md`.
-- [ ] Run the candidate's `bash scripts/qualify_release.sh` **on the target macOS host**. Do not infer a pass from earlier validation on an older commit.
+- [x] Run `bash scripts/qualify_release.sh` on macOS at commit `7ea18711ab73fbca4eaea25694768d43ec68ea79` (October 15): 192 pytest tests, 14 explicit live-shell tests, headless CLI check, build and artifact inspections passed.
 - [x] Complete the manual Kitty picker, selection, redirected output, and non-TTY acceptance steps (user-reported passing October 15; exact commit not recorded).
 - [x] Complete the manual real-workload fidelity checks in `docs/RELEASE_QUALIFICATION.md` (user-reported passing October 15; evidence not independently re-inspected after PR #13).
-- [ ] Record build artifacts, the exact checked commit, and the results of release qualification.
+- [x] Record artifacts and exact qualified revision in `docs/RELEASE_QUALIFICATION.md`; verified `dist/copout-0.12.0.tar.gz` and `dist/copout-0.12.0-py3-none-any.whl`.
 - [ ] Tag and publish **only on explicit request** after the gates pass.
 
 ## Follow-up hardening (not release blockers)
 
-- [x] Implement automatic fresh-session setup and identity assertions in the real zsh/Atuin PTY tests. Actual macOS lifecycle validation remains pending.
+- [x] Implement fresh-session setup and identity assertions in real zsh/Atuin PTY tests; explicit macOS live suite passed October 15.
 - [x] Implement an opt-in multi-version Typer compatibility test matrix; **run it** before revising dependency bounds.
 - [x] Implement a paired, stable-selection performance benchmark; **run it** before optimizing context capture.
 - [x] Add regression tests proving old Atuin facts remain separate from Git state observed when Copout runs; continue requiring authoritative upstream historical sources.
 - [x] Validate hardening on macOS: 192 pytest tests, four Typer versions, and a paired 10-command benchmark all passed October 15 (see `docs/HARDENING.md`).
-- [ ] Preserve the one-file Ruff formatting change from the local `just fix` and recheck the pushed PR head before merge.
-- [ ] Ensure the release qualification script/build artifact checks have passed on the final candidate revision before tagging.
+- [x] Preserve Ruff formatting, validate clean merged head, and merge PR #14 as `7ea18711ab73fbca4eaea25694768d43ec68ea79`.
+- [x] Qualify the final implementation revision (`7ea1871`) with `scripts/qualify_release.sh`; tagged/public release remains pending explicit request.
 
 ## Prior 0.11.0 development
 
@@ -37,4 +37,4 @@
 
 ## Existing evidence
 
-Earlier local `just fix` and `just check` passed without changes on the merged schema-v9 PR, before this release-candidate revision. Those results are useful but **do not** qualify this candidate commit. The former 0.10.0 validation on 2026-10-01 passed with 127 tests.
+The release candidate at `7ea18711ab73fbca4eaea25694768d43ec68ea79` passed the automated macOS release gate on 2026-10-15. Manual Kitty checks were reported passing earlier that day. Only publication/tagging is intentionally outstanding; the former 0.10.0 validation on 2026-10-01 passed with 127 tests.
