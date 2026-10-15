@@ -15,7 +15,7 @@ The script runs a locked dependency sync, non-mutating `just check`, explicit li
 
 ## Human-observed Kitty interaction gate
 
-Use a normal Kitty shell with a working Atuin session. First issue two recognizable commands, e.g. `printf 'copout-smoke-first\\n'` and `printf 'copout-smoke-second\\n'`. Then verify each:
+Use a normal Kitty shell with a working Atuin session. First issue two recognizable commands, e.g. `printf 'copout-smoke-first\n'` and `printf 'copout-smoke-second\n'`. Then verify each:
 
 - [ ] Bare `copout` opens the picker. With no selections, Enter copies the most recent eligible entry, without printing a second prompt or leaking TUI drawing into the payload.
 - [ ] `copout` with Space on two entries and Enter copies two runs in chronological order. Esc cancels without replacing the clipboard.
