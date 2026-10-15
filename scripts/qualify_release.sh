@@ -30,7 +30,6 @@ if grep -Eq '[0-9]+ skipped' <<<"$live_output"; then
   exit 2
 fi
 
-
 # Verify headless CLI behavior against the current Atuin session.
 .venv/bin/python - <<'PY'
 import json
