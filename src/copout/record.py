@@ -7,10 +7,12 @@ from . import context as context_capture
 from .atuin import AtuinError, HistoryEntry, recent_entries
 from .config import ContextOptions
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 OutputState = Literal["captured", "unavailable"]
 OutputSource = Literal["atuin-pty-proxy", "atuin-history-only"]
+OutputCompleteness = Literal["unknown", "incomplete", "unavailable"]
+
 
 
 class ResultRecord(TypedDict):
@@ -22,6 +24,9 @@ class OutputRecord(TypedDict):
     source: OutputSource
     text: str
     captured_bytes: int
+    presented_bytes: int
+    completeness: OutputCompleteness
+    coverage_warning: NotRequired[str]
     truncated: bool | None
     observed_bytes: int | None
     total_bytes: int | None
@@ -81,18 +86,38 @@ def _metadata(context_options: ContextOptions | None = None) -> CaptureMetadata:
 def _entry_record(entry: HistoryEntry, git: context_capture.GitContext | None = None) -> RunRecord:
     captured = entry.output is not None
     text = entry.output or ""
+    captured_bytes = len(text.encode("utf-8", errors="surrogatepass"))
+    truncated = entry.output_truncated if captured else None
+    exit_complete = entry.output_exit_capture_complete if captured else None
+    completeness: OutputCompleteness = (
+        "unavailable"
+        if not captured
+        else "incomplete"
+        if truncated is True or exit_complete is False
+        else "unknown"
+    )
     output: OutputRecord = {
         "state": "captured" if captured else "unavailable",
         "error": entry.output_error,
         "source": "atuin-pty-proxy" if captured else "atuin-history-only",
         "text": text,
-        "captured_bytes": len(text.encode()),
-        "truncated": entry.output_truncated if captured else None,
+        "captured_bytes": captured_bytes,
+        "presented_bytes": captured_bytes,
+        "completeness": completeness,
+        "truncated": truncated,
         "observed_bytes": entry.output_observed_bytes if captured else None,
         "total_bytes": entry.output_total_bytes if captured else None,
     }
-    if captured and entry.output_exit_capture_complete is not None:
-        output["exit_capture_complete"] = entry.output_exit_capture_complete
+    if exit_complete is not None:
+        output["exit_capture_complete"] = exit_complete
+    # PTY traffic includes redraws, so these sizes cannot prove loss. A large
+    # discrepancy is nevertheless useful evidence of a possibly incomplete
+    # terminal-rendered snapshot (rather than a complete transcript).
+    observed = entry.output_observed_bytes if captured else None
+    if observed is not None and observed - captured_bytes >= 65536 and observed >= 8 * max(
+        captured_bytes, 1
+    ):
+        output["coverage_warning"] = "rendered-snapshot-much-smaller-than-pty-traffic"
 
     context: ContextRecord = {"cwd": entry.cwd}
     if git:
@@ -121,7 +146,7 @@ def build_record_from_entries(
     *,
     context_options: ContextOptions | None = None,
 ) -> CopoutRecord:
-    """Build one schema-v8 capture envelope from chronological entries."""
+    """Build one schema-v9 capture envelope from chronological entries."""
     if not entries:
         raise ValueError("a Copout record requires at least one run")
 
