@@ -1,3 +1,6 @@
 .cache
 __pycache__/
 *.py[cod]
+
+# Local capture-fidelity diagnostics
+copout-evidence-*/

@@ -12,7 +12,7 @@ runner = CliRunner()
 def _record_fixture(*, context_options=None) -> dict:
     del context_options
     return {
-        "version": 8,
+        "version": 9,
         "source": "atuin",
         "captured_at": "2026-10-01T09:30:00-04:00",
         "runs": [
@@ -26,6 +26,8 @@ def _record_fixture(*, context_options=None) -> dict:
                     "source": "atuin-pty-proxy",
                     "text": "hi\n",
                     "captured_bytes": 3,
+                    "presented_bytes": 3,
+                    "completeness": "unknown",
                     "truncated": False,
                     "observed_bytes": 3,
                     "total_bytes": 3,
@@ -311,7 +313,7 @@ def test_print_writes_semantic_result_to_stdout(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert result.stderr == ""
-    assert result.stdout.startswith('<copout version="8"')
+    assert result.stdout.startswith('<copout version="9"')
     assert 'source="atuin"' not in result.stdout
     assert "<![CDATA[echo hi]]>" in result.stdout
 

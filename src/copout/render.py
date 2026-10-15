@@ -7,9 +7,10 @@ import re
 
 from .context import EnvironmentContext, GitContext
 from .record import CopoutRecord, OutputRecord, RunRecord
+from .terminal import plain_terminal_text
 
-MAX_OUTPUT_BYTES_PER_RUN = 128 * 1024
-MAX_OUTPUT_BYTES_TOTAL = 512 * 1024
+MAX_OUTPUT_BYTES_PER_RUN = 256 * 1024
+MAX_OUTPUT_BYTES_TOTAL = 1024 * 1024
 
 
 def _encoded_text(text: str, *, attribute: bool = False) -> tuple[str, bool]:
@@ -76,8 +77,8 @@ def _element(
 
 
 def _semantic_text(text: str) -> str:
-    """Remove terminal-end ASCII whitespace while preserving internal layout and SGR styling."""
-    return text.rstrip(" \t\r\n")
+    """Return safe, terminal-normalized text for all presentation formats."""
+    return plain_terminal_text(text)
 
 
 def _duration_ms(seconds: float) -> int:
@@ -144,14 +145,14 @@ def _semantic_record(record: CopoutRecord) -> CopoutRecord:
         output = run["output"]
         text = _semantic_text(output["text"])
         output["text"] = text
-        output["captured_bytes"] = len(text.encode())
+        output["presented_bytes"] = len(text.encode())
 
-    budgets = _fair_output_budgets([run["output"]["captured_bytes"] for run in runs])
+    budgets = _fair_output_budgets([run["output"]["presented_bytes"] for run in runs])
     for run, budget in zip(runs, budgets, strict=True):
         output = run["output"]
         text, omitted = _bound_text(output["text"], budget=budget)
         output["text"] = text
-        output["captured_bytes"] = len(text.encode())
+        output["presented_bytes"] = len(text.encode())
         if omitted:
             output["presentation_truncated"] = True
             output["presentation_omitted_bytes"] = omitted
@@ -163,6 +164,7 @@ def _extended_output_metadata_needed(output: OutputRecord) -> bool:
         output["truncated"]
         or output.get("presentation_truncated")
         or output.get("exit_capture_complete") is False
+        or output.get("coverage_warning")
     )
 
 
@@ -172,10 +174,13 @@ def _output_attributes(output: OutputRecord) -> list[str]:
         attrs.append(_attribute("state", output["state"]))
 
     extended = _extended_output_metadata_needed(output)
+    if output["state"] == "captured":
+        attrs.append(_attribute("completeness", output["completeness"]))
     if output["truncated"]:
         attrs.append(_attribute("truncated", "true"))
     if extended and output["state"] == "captured":
         attrs.append(_attribute("captured_bytes", output["captured_bytes"]))
+        attrs.append(_attribute("presented_bytes", output["presented_bytes"]))
         if output["observed_bytes"] is not None:
             attrs.append(_attribute("observed_bytes", output["observed_bytes"]))
         if output["total_bytes"] is not None:
@@ -183,6 +188,8 @@ def _output_attributes(output: OutputRecord) -> list[str]:
         if (complete := output.get("exit_capture_complete")) is not None:
             attrs.append(_attribute("exit_capture_complete", str(complete).lower()))
 
+    if warning := output.get("coverage_warning"):
+        attrs.append(_attribute("coverage_warning", warning))
     if output.get("presentation_truncated"):
         attrs.append(_attribute("presentation_truncated", "true"))
         attrs.append(
@@ -445,6 +452,9 @@ def _render_markdown(record: CopoutRecord) -> str:
                 details.append(f"commit {_inline_value(commit[:12])}")
             if git.get("dirty"):
                 details.append("dirty")
+        output = run["output"]
+        if output["state"] == "captured":
+            details.append(f"capture {output['completeness']} (terminal snapshot)")
         if details:
             lines.extend(("", " · ".join(details)))
         lines.extend(("", "Command:", "", _fence(run["command"], "console")))
@@ -455,6 +465,17 @@ def _render_markdown(record: CopoutRecord) -> str:
             lines.extend(("", "Output unavailable."))
         if output["truncated"]:
             lines.extend(("", "Note: Atuin truncated the captured output."))
+        if output.get("exit_capture_complete") is False:
+            lines.extend(("", "Note: Upstream capture did not complete at command exit."))
+        if output.get("coverage_warning"):
+            lines.extend(
+                (
+                    "",
+                    "Note: The rendered snapshot is much smaller than observed PTY traffic; "
+                    "earlier terminal output may be missing. These byte counts measure "
+                    "different representations.",
+                )
+            )
         if output.get("presentation_truncated"):
             omitted = output.get("presentation_omitted_bytes", 0)
             lines.extend(("", f"Note: Copout omitted {omitted} output bytes."))

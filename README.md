@@ -81,13 +81,13 @@ Copout retrieves persisted chronological history with `atuin history list --sess
 
 ## Presentation behavior
 
-Copout removes ASCII whitespace only from the end of complete captured output. This eliminates terminal-cell padding and final blank rows while preserving internal indentation, spacing, blank lines, and any SGR styling that survives Atuin's capture.
+Copout presents Atuin's retained terminal snapshot as safe plain text across XML, JSON, and Markdown. It removes ANSI styling and interprets common carriage-return, backspace, cursor, and erase-line redraws. Internal newlines are retained, while terminal-end padding is removed. This normalization cannot recover scrollback or earlier output absent from Atuin's stored snapshot.
 
-Presented output is bounded to 128 KiB per run and 512 KiB across all runs, including captures containing only one run. Oversized output preserves both its beginning and end with an explicit omission marker. JSON adds `presentation_truncated` and `presentation_omitted_bytes` when Copout shortens an output, while XML adds the same attributes to `<output>`. This presentation truncation is separate from any truncation reported by Atuin. Because schema v8 uses one universal envelope, the presentation rules no longer depend on whether a command was selected with `-n 1`, a positional selector, or the TUI.
+Presented output is bounded to 256 KiB per run and 1 MiB across all runs, including captures containing only one run. Oversized output preserves both its beginning and end with an explicit omission marker. JSON adds `presentation_truncated` and `presentation_omitted_bytes` when Copout shortens an output, while XML adds the same attributes to `<output>`. This presentation truncation is separate from any truncation reported by Atuin. Because schema v9 uses one universal envelope, the presentation rules no longer depend on whether a command was selected with `-n 1`, a positional selector, or the TUI.
 
 ## Execution context
 
-Schema version 8 can add compact environment and repository context. The defaults are intended to provide useful development context without automatically exposing hostnames, remotes, arbitrary environment variables, or large diffs.
+Schema version 9 retains compact environment and repository context. The defaults are intended to provide useful development context without automatically exposing hostnames, remotes, arbitrary environment variables, or large diffs.
 
 Enabled by default:
 
@@ -129,11 +129,13 @@ env = []
 executables = []
 ```
 
-## Output format (schema version 8)
+## Output format (schema version 9)
 
-Schema v8 has one record shape for every capture. The root contains capture metadata plus a non-empty `runs` array; a single selected command is represented by a one-element `runs` array, exactly like one run within a larger selection. The schema no longer has `scope`, distinct command/history record types, or the old `history` summary object. Query intent is not encoded into the result shape.
+Schema v9 has one record shape for every capture. The root contains capture metadata plus a non-empty `runs` array; a single selected command is represented by a one-element `runs` array, exactly like one run within a larger selection. The schema no longer has `scope`, distinct command/history record types, or the old `history` summary object. Query intent is not encoded into the result shape.
 
-Copout's internal record retains capture metadata. JSON exposes that structured record after normalizing each `output.text` by removing terminal-end ASCII whitespace. `captured_bytes` is recomputed from the presented text. `observed_bytes` is the upstream count of bytes observed before rendering when the backend supplies it. `total_bytes` is reserved for a true complete-output byte count and is left unknown when the backend cannot supply that fact. Atuin's current command-output RPC reports the size of its stored rendered output rather than the complete pre-truncation output size, so Copout does not map that value to `total_bytes`.
+Copout's internal record retains capture metadata. In schema v9, `output.text` is normalized, human-readable terminal text in every format. `captured_bytes` measures Atuin's retrieved snapshot **before** Copout normalization, while `presented_bytes` measures the normalized text **after** optional output budgeting. `observed_bytes` is upstream PTY traffic, including redraws and control sequences; it is **not** directly comparable with the retained snapshot length. `total_bytes` is reserved for a verified complete-output byte count and remains unknown unless the provider supplies it. The Atuin output RPC's stored-rendered-output size is not a complete transcript size.
+
+`completeness` is `unknown` for ordinary Atuin snapshots, `incomplete` when upstream truncation or a known incomplete exit capture is reported, and `unavailable` when there is no captured text. Atuin's `truncated: false` **does not establish that the entire terminal transcript is present**. A large difference between `observed_bytes` and snapshot bytes adds `coverage_warning: "rendered-snapshot-much-smaller-than-pty-traffic"`; that is a diagnostic indicator, **not proof** of dropped output. Copout cannot correct upstream snapshot loss by changing its own output budget.
 
 A typical XML history result can look like:
 
@@ -145,7 +147,7 @@ A typical XML history result can look like:
   <run history_id="..." status="0" cwd="/repo" duration_ms="102" recorded_at="2026-10-01 09:30:59">
     <git observed_at_capture="true" root="/repo" branch="main" detached="false" commit="abc123..." dirty="false"/>
     <command><![CDATA[printf 'hello\n']]></command>
-    <output><![CDATA[hello]]></output>
+    <output completeness="unknown"><![CDATA[hello]]></output>
   </run>
 </copout>
 ```
@@ -156,24 +158,27 @@ XML has one `<run>` per selected command, including for a one-command capture, a
 
 When an element has no `encoding` attribute, its XML character content is the presented UTF-8 text directly. CDATA is only an XML serialization detail; ordinary XML parsing recovers the text.
 
-When an element has `encoding="json-string"`, concatenate/read its XML character content and JSON-decode it exactly once to recover the presented text. Copout uses this form when XML 1.0 cannot represent the text losslessly, including terminal control characters or carriage returns that XML parsing would otherwise normalize. Attribute values that need the same treatment use a companion marker such as `cwd_encoding="json-string"`.
+When an element has `encoding="json-string"`, concatenate/read its XML character content and JSON-decode it exactly once to recover the presented text. This fallback is primarily needed for commands and metadata containing XML-forbidden characters; normal output has already been converted to safe plain text. Attribute values that need the same treatment use a companion marker such as `cwd_encoding="json-string"`.
 
 "Presented text" means the text after Copout's terminal-end whitespace removal and any documented presentation truncation. It is therefore not necessarily byte-for-byte identical to the original PTY capture.
 
 ### Sparse output metadata
 
-A normal complete capture remains compact:
+An ordinary captured snapshot remains compact:
 
 ```xml
 <output><![CDATA[hello]]></output>
 ```
 
-Extended attributes appear only when they explain an exceptional or incomplete capture. Supported attributes are:
+Capture completeness is explicit. Other extended attributes appear when they explain an exceptional capture or presentation limit. Supported attributes are:
 
 - `state`: emitted when output is not in the normal captured state, currently `state="unavailable"`.
 - `encoding`: emitted only when the element payload is a JSON string rather than literal XML character content.
+- `completeness`: always present on captured XML output; `unknown` is normal for a terminal snapshot, not a certification of completeness.
+- `coverage_warning`: emitted when upstream PTY traffic is much larger than the rendered snapshot; this is a heuristic and does not prove loss.
 - `truncated`: emitted as `true` when the upstream capture mechanism reports truncation.
-- `captured_bytes`: byte length of the presented `<output>` text after decoding its transport encoding. It is emitted with extended incompleteness/truncation metadata, not on ordinary captures.
+- `captured_bytes`: byte length of Atuin's retrieved snapshot before normalization. Shown in XML only with extended metadata.
+- `presented_bytes`: byte length of the visible, normalized output text after Copout's own budget. Shown in XML only with extended metadata.
 - `observed_bytes`: upstream count of bytes observed by the capture mechanism before rendering, when supplied and extended metadata is needed.
 - `total_bytes`: true complete-output byte size, only when a backend can supply that fact independently. Copout does not infer it, and the current Atuin RPC's stored-rendered-output byte count is not used for this field.
 - `exit_capture_complete`: whether the capture mechanism reports that capture remained active through process termination. Copout emits it only when the upstream API provides it and extended metadata is otherwise relevant; absence does not imply `true`.
@@ -182,11 +187,24 @@ Copout also retains `presentation_truncated` and `presentation_omitted_bytes` wh
 
 Unavailable output retains an `error` attribute when Copout knows why retrieval failed. Atuin-truncated output and Copout presentation truncation remain distinct.
 
-Atuin's command capture is a terminal-rendered representation. Copout consumes that representation and does not attempt to intercept or reconstruct the underlying PTY stream or terminal input.
+Atuin's command capture is a terminal-rendered representation. Copout consumes that representation and does not intercept the underlying PTY stream, retain its own logs, or guarantee that rendered scrollback is available.
 
 Daemon connection establishment, individual output requests, and status requests each have a three-second deadline. An unavailable or timed-out output request leaves usable history with output marked unavailable. A timed-out status request is reported by `copout doctor` and `copout verify`.
 
 If output retrieval fails, the output record's `error` field (or XML attribute) preserves the reason. `UNIMPLEMENTED` means the daemon does not provide the output RPC expected by the installed Jerakeen client; it is not evidence of a missing capture or a disabled configuration flag. A healthy daemon status alone does not establish output API compatibility. `copout doctor` and `copout verify` report this distinction.
+
+
+## Collecting capture-fidelity evidence
+
+To reproduce a bounded but long terminal transcript, run `bash scripts/probe_output.sh` in a Kitty shell with Atuin output capture active. Alternatively, run the command you actually want to diagnose. Optionally select its visible output in Kitty and copy it to the clipboard. Then, from this repository in the same Atuin session:
+
+```console
+uv run python scripts/collect_evidence.py --kitty-clipboard
+```
+
+Omit `--kitty-clipboard` if there is no Kitty selection to save. The collector skips its own shell-history entry and retrieves the most recent other eligible command via Atuin/Jerakeen. It writes one timestamped directory with `atuin-snapshot.txt` (the unnormalized text returned by Jerakeen when available), `copout.json`, `copout.xml`, `copout.md`, and `summary.json`; with the optional clipboard input it also saves `kitty-selection.txt`, `atuin-normalized.txt` (when the upstream snapshot is available), `kitty-vs-atuin.diff` (full normalized upstream versus Kitty), and `kitty-vs-copout.diff` (bounded Copout presentation versus Kitty). The JSON summary reports exact normalized-Kitty equality separately from Copout presentation equality. These comparisons are diagnostic, not raw PTY equivalence tests: Kitty selections may include prompts, and Atuin collapses redraws. The two diffs must not be conflated when diagnosing truncation.
+
+Use `--history-id ID` to select an exact history entry within the latest 100 entries, or `--output DIRECTORY` to control the new evidence directory. Evidence may contain sensitive terminal text; inspect it before sharing.
 
 ## Testing
 

@@ -4,6 +4,7 @@
 
 - [x] Complete the selector-first CLI and picker stabilization work.
 - [x] Advance structured output to schema v8 with one universal `runs` envelope.
+- [x] Advance to schema v9 with explicit terminal-snapshot completeness and normalized, safe plain-text output.
 - [x] Add and stress-test real-shell stderr-capture diagnostics; no loss reproduced at 200 or 1000 rapid commands.
 - [x] Bump package and lockfile metadata to 0.11.0.
 - [x] Move the accumulated Unreleased changelog into the 0.11.0 release section.

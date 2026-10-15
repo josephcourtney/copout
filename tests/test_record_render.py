@@ -24,7 +24,7 @@ def test_build_record(monkeypatch) -> None:
         ],
     )
     result = record.build_record()
-    assert result["version"] == 8
+    assert result["version"] == 9
     assert result["source"] == "atuin"
     assert "scope" not in result
     assert "history" not in result
@@ -75,7 +75,7 @@ def test_build_history_uses_same_universal_envelope(monkeypatch) -> None:
 
     result = record.build_history(count=2)
 
-    assert result["version"] == 8
+    assert result["version"] == 9
     assert result["source"] == "atuin"
     assert "scope" not in result
     assert "history" not in result
@@ -94,7 +94,7 @@ def test_render_json_uses_semantic_output(monkeypatch) -> None:
     )
     rendered = render.render(record.build_record(), as_json=True)
     payload = json.loads(rendered)
-    assert payload["version"] == 8
+    assert payload["version"] == 9
     assert payload["source"] == "atuin"
     assert "scope" not in payload
     assert "history" not in payload
@@ -102,7 +102,9 @@ def test_render_json_uses_semantic_output(monkeypatch) -> None:
     run = payload["runs"][0]
     assert run["history_id"] == "id1"
     assert run["output"]["text"] == "hi"
-    assert run["output"]["captured_bytes"] == 2
+    assert run["output"]["captured_bytes"] == 6
+    assert run["output"]["presented_bytes"] == 2
+    assert run["output"]["completeness"] == "unknown"
     assert "utf8_bytes" not in run["output"]
 
 
@@ -115,7 +117,7 @@ def test_render_xml_is_compact_semantic_context(monkeypatch) -> None:
         ],
     )
     root = ElementTree.fromstring(render.render(record.build_record()))
-    assert root.attrib["version"] == "8"
+    assert root.attrib["version"] == "9"
     assert "captured_at" in root.attrib
     run = root.find("run")
     assert run is not None
@@ -128,14 +130,14 @@ def test_render_xml_is_compact_semantic_context(monkeypatch) -> None:
     assert run.findtext("command") == "echo <x>"
     output = run.find("output")
     assert output is not None
-    assert output.attrib == {}
+    assert output.attrib == {"completeness": "unknown"}
     assert output.text == "<x>"
 
 
 def test_one_run_xml_uses_same_envelope_and_includes_history_id() -> None:
     captured = record.build_record_from_entries([HistoryEntry("id", "echo hi", output="hi\n")])
     root = ElementTree.fromstring(render.render(captured))
-    assert root.attrib["version"] == "8"
+    assert root.attrib["version"] == "9"
     assert "captured_at" in root.attrib
     runs = root.findall("run")
     assert len(runs) == 1
@@ -188,11 +190,18 @@ def test_xml_round_trips_controls_and_attribute_whitespace(monkeypatch) -> None:
     assert run is not None
     assert run.attrib["cwd_encoding"] == "json-string"
     assert json.loads(run.attrib["cwd"]) == cwd
-    for name, expected in (("command", command), ("output", output)):
+    for name, expected in (
+        ("command", command),
+        ("output", r"\x00\x01\x1b\ufffe\uffff" + "\n]]> café"),
+    ):
         element = run.find(name)
         assert element is not None
-        assert element.attrib["encoding"] == "json-string"
-        assert json.loads(element.text or "") == expected
+        if name == "command":
+            assert element.attrib["encoding"] == "json-string"
+            assert json.loads(element.text or "") == expected
+        else:
+            assert "encoding" not in element.attrib
+            assert element.text == expected
 
 
 def test_xml_plain_text_and_cdata_terminator_round_trip(monkeypatch) -> None:
@@ -205,7 +214,7 @@ def test_xml_plain_text_and_cdata_terminator_round_trip(monkeypatch) -> None:
         element = root.find(f"run/{name}")
         assert element is not None
         assert "encoding" not in element.attrib
-        assert element.text == text
+        assert element.text == (text if name == "command" else "café\n        ]]> & < >")
 
 
 def test_normal_capture_metadata_stays_sparse(monkeypatch) -> None:
@@ -223,7 +232,7 @@ def test_normal_capture_metadata_stays_sparse(monkeypatch) -> None:
     output = ElementTree.fromstring(render.render(record.build_record())).find("run/output")
 
     assert output is not None
-    assert output.attrib == {}
+    assert output.attrib == {"completeness": "unknown"}
 
 
 def test_extended_capture_metadata_is_emitted_for_incomplete_output(monkeypatch) -> None:
@@ -242,8 +251,10 @@ def test_extended_capture_metadata_is_emitted_for_incomplete_output(monkeypatch)
 
     assert output is not None
     assert output.attrib == {
+        "completeness": "incomplete",
         "truncated": "true",
-        "captured_bytes": "5",
+        "captured_bytes": "6",
+        "presented_bytes": "5",
         "observed_bytes": "24",
         "total_bytes": "30",
         "exit_capture_complete": "false",
@@ -253,6 +264,7 @@ def test_extended_capture_metadata_is_emitted_for_incomplete_output(monkeypatch)
 def test_unavailable_capture_metadata_is_unknown(monkeypatch) -> None:
     monkeypatch.setattr(record, "recent_entries", lambda count: [HistoryEntry("id", "true")])
     output = record.build_record()["runs"][0]["output"]
+    assert output["completeness"] == "unavailable"
     assert output["truncated"] is None
     assert output["observed_bytes"] is None
     assert output["total_bytes"] is None

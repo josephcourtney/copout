@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Changed
+
+- Advance presentation schema to version 9: `captured_bytes` now measures the retrieved Atuin snapshot before normalization, and new `presented_bytes` measures output after terminal normalization and presentation budgeting.
+- Normalize ANSI styling, carriage-return redraws, backspaces, and common terminal cursor/erase controls to safe plain text consistently across XML, JSON, and Markdown.
+- Increase bounded presentation limits from 128 KiB/run and 512 KiB total to 256 KiB/run and 1 MiB total; a verified 201 KiB terminal snapshot now fits without Copout truncation.
+- Make ordinary Atuin snapshot completeness explicitly `unknown`, even when its upstream `truncated` flag is `false`. Report known incomplete upstream captures separately from Copout's presentation truncation.
+
+### Added
+
+- Add a diagnostic coverage warning for large discrepancies between observed PTY traffic and retained rendered snapshots, without treating non-equivalent byte counts as proof of data loss.
+- Preserve the optional upstream exit-capture completeness signal through to metadata.
+- Add terminal-normalization golden tests and a reproducible Kitty/Atuin/Copout evidence collector that distinguishes full upstream fidelity comparisons from Copout's bounded presentation.
+
+
 ## 0.11.0 - 2026-10-06
 
 ### Added

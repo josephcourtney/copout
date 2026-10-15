@@ -180,7 +180,7 @@ def test_command_copies_to_helper(command_env: CommandEnvironment) -> None:
     assert result.returncode == 0, result.stderr
     assert result.stdout == result.stderr == ""
     copied = command_env.clipboard.read_text()
-    assert copied.startswith('<copout version="8"')
+    assert copied.startswith('<copout version="9"')
     assert "<![CDATA[héllo]]>" in copied
     assert "captured_bytes" not in copied
     assert 'source="atuin"' not in copied
@@ -193,7 +193,7 @@ def test_output_removes_terminal_end_padding(command_env: CommandEnvironment) ->
     output = ElementTree.fromstring(result.stdout).find("run/output")
     assert output is not None
     assert output.text == "hello"
-    assert output.attrib == {}
+    assert output.attrib == {"completeness": "unknown"}
 
 
 @pytest.mark.parametrize("failure", [False, True])
@@ -324,18 +324,22 @@ def test_truncated_output_metadata(command_env: CommandEnvironment, as_json: boo
         assert output["truncated"] is True
         assert output["observed_bytes"] == 10000
         assert output["total_bytes"] is None
-        assert output["captured_bytes"] == len("héllo".encode())
+        assert output["captured_bytes"] == len("héllo\n".encode())
+        assert output["presented_bytes"] == len("héllo".encode())
+        assert output["completeness"] == "incomplete"
     else:
         output_element = ElementTree.fromstring(result.stdout).find("run/output")
         assert output_element is not None
         assert output_element.attrib == {
+            "completeness": "incomplete",
             "truncated": "true",
-            "captured_bytes": str(len("héllo".encode())),
+            "captured_bytes": str(len("héllo\n".encode())),
+            "presented_bytes": str(len("héllo".encode())),
             "observed_bytes": "10000",
         }
 
 
-def test_xml_keeps_ansi_but_trims_terminal_end_whitespace(
+def test_xml_strips_ansi_and_trims_terminal_end_whitespace(
     command_env: CommandEnvironment,
 ) -> None:
     original = "\x1b[31mred\x1b[0m\r\n"
@@ -344,8 +348,8 @@ def test_xml_keeps_ansi_but_trims_terminal_end_whitespace(
     assert result.returncode == 0, result.stderr
     output = ElementTree.fromstring(result.stdout).find("run/output")
     assert output is not None
-    assert output.attrib["encoding"] == "json-string"
-    assert json.loads(output.text or "") == "\x1b[31mred\x1b[0m"
+    assert output.attrib == {"completeness": "unknown"}
+    assert output.text == "red"
 
 
 @pytest.mark.parametrize("subcommand", ["doctor", "verify", "print"])
