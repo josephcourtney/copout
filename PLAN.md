@@ -4,7 +4,7 @@
 
 Copout is a small, invocation-driven adapter around Atuin. Atuin owns persisted command history, session identity, daemon lifecycle, and ephemeral rendered PTY snapshots. Jerakeen supplies the public Python interface to the daemon. Copout selects recent records, adds bounded read-only context, renders safe text in XML/JSON/Markdown, and copies or prints the results.
 
-The **0.12.0 release candidate** incorporates the merged schema-v9 and optional hardening work. It passed macOS release qualification on October 15 at commit `7ea18711ab73fbca4eaea25694768d43ec68ea79`. This is **not** a tagged or published release; the changelog remains under *Unreleased* until an explicitly authorized release.
+The **0.12.0 release candidate** incorporates the merged schema-v9 and optional hardening work. It passed macOS release qualification on October 15 at commit `7ea18711ab73fbca4eaea25694768d43ec68ea79`. The release changelog and GitHub release notes have been finalized following explicit release authorization. Tag creation and GitHub publication are separate operations and must be verified independently.
 
 ## Completed implementation
 
@@ -24,7 +24,7 @@ The uploaded Oct 15 diagnostic probe confirmed all 2,400 lines and both markers 
 
 On October 15, the user completed the manual Kitty acceptance matrix and ran `bash scripts/qualify_release.sh` on macOS against `7ea1871`. Ruff, `ty`, 192 tests, the separate 14-test live suite, headless checks, and wheel/sdist inspections passed. The two build artifacts are `dist/copout-0.12.0-py3-none-any.whl` and `dist/copout-0.12.0.tar.gz`. See `docs/RELEASE_QUALIFICATION.md` for the acceptance record.
 
-The candidate is qualified. No release tag or publication has been requested or performed. The release script deliberately does not release.
+The candidate is qualified, and release authorization was given October 15. The notes are prepared in `docs/releases/0.12.0.md`; do not claim publication until the tag and GitHub release both exist. The qualification script deliberately does not release.
 
 ## Optional hardening
 

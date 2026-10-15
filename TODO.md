@@ -15,7 +15,10 @@
 - [x] Complete the manual Kitty picker, selection, redirected output, and non-TTY acceptance steps (user-reported passing October 15; exact commit not recorded).
 - [x] Complete the manual real-workload fidelity checks in `docs/RELEASE_QUALIFICATION.md` (user-reported passing October 15; evidence not independently re-inspected after PR #13).
 - [x] Record artifacts and exact qualified revision in `docs/RELEASE_QUALIFICATION.md`; verified `dist/copout-0.12.0.tar.gz` and `dist/copout-0.12.0-py3-none-any.whl`.
-- [ ] Tag and publish **only on explicit request** after the gates pass.
+- [x] Receive explicit authorization to tag and publish `v0.12.0` (October 15, 2026).
+- [x] Finalize the dated `CHANGELOG.md` entry and GitHub release notes.
+- [ ] Create and verify the `v0.12.0` Git tag against the final release commit.
+- [ ] Publish and verify the GitHub release, including the rebuilt wheel and source distribution.
 
 ## Follow-up hardening (not release blockers)
 
@@ -37,4 +40,4 @@
 
 ## Existing evidence
 
-The release candidate at `7ea18711ab73fbca4eaea25694768d43ec68ea79` passed the automated macOS release gate on 2026-10-15. Manual Kitty checks were reported passing earlier that day. Only publication/tagging is intentionally outstanding; the former 0.10.0 validation on 2026-10-01 passed with 127 tests.
+The release candidate at `7ea18711ab73fbca4eaea25694768d43ec68ea79` passed the automated macOS release gate on 2026-10-15. Manual Kitty checks were reported passing earlier that day. Tag creation and GitHub release publication remain pending verification; the former 0.10.0 validation on 2026-10-01 passed with 127 tests.
