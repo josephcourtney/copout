@@ -5,6 +5,7 @@
 ### Fixed
 
 - Snapshot Git and environment context before opening the Atuin gRPC client, avoiding macOS gRPC fork-handler diagnostics during normal command capture while preserving Git metadata.
+- Update the pinned Jerakeen dependency to its Atuin 18.24 / protocol-5 compatible commit, restoring command-output retrieval on protocol-5 daemons.
 
 ## 0.12.0 - 2026-10-15
 
