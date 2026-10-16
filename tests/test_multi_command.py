@@ -6,7 +6,7 @@ from xml.etree import ElementTree
 import pytest
 from typer.testing import CliRunner
 
-from copout import atuin, cli, record, render
+from copout import atuin, cli, context, record, render
 from copout.atuin import HistoryEntry
 
 runner = CliRunner()
@@ -49,7 +49,7 @@ def test_hydrate_outputs_fetches_only_supplied_entries(monkeypatch) -> None:
 
 
 def test_build_history_rejects_empty_matches(monkeypatch) -> None:
-    monkeypatch.setattr(record, "recent_entries", lambda count, *, failed_only=False: [])
+    monkeypatch.setattr(record, "recent_history", lambda count, *, failed_only=False: [])
 
     with pytest.raises(record.AtuinError, match="no non-copout commands"):
         record.build_history(count=3)
@@ -58,7 +58,7 @@ def test_build_history_rejects_empty_matches(monkeypatch) -> None:
 
 
 def test_failure_query_reports_no_matches(monkeypatch) -> None:
-    monkeypatch.setattr(record, "recent_entries", lambda count, *, failed_only=False: [])
+    monkeypatch.setattr(record, "recent_history", lambda count, *, failed_only=False: [])
 
     result = runner.invoke(cli.app, ["--failure", "--print"])
 
@@ -271,8 +271,9 @@ def test_history_total_output_budget_is_shared() -> None:
 def test_single_command_output_uses_same_presentation_budget(monkeypatch) -> None:
     text = "x" * (render.MAX_OUTPUT_BYTES_PER_RUN + 1000)
     monkeypatch.setattr(
-        record, "recent_entries", lambda count: [HistoryEntry("id", "cmd", output=text)]
+        record, "recent_history", lambda count: [HistoryEntry("id", "cmd", output=text)]
     )
+    monkeypatch.setattr(record, "hydrate_outputs", lambda entries: entries)
 
     payload = json.loads(render.render(record.build_record(), as_json=True))
     output = payload["runs"][0]["output"]
@@ -304,3 +305,29 @@ def test_xml_reports_presentation_truncation_separately() -> None:
     assert int(output.attrib["presentation_omitted_bytes"]) > 0
     assert int(output.attrib["presented_bytes"]) <= render.MAX_OUTPUT_BYTES_PER_RUN
     assert "truncated" not in output.attrib
+
+
+def test_positional_selector_captures_git_before_grpc(monkeypatch) -> None:
+
+    entry = HistoryEntry("1", "echo hi", "/repo", output="hi")
+    events: list[str] = []
+    monkeypatch.setattr(cli.atuin, "recent_history", lambda limit, *, required_ids=(): [entry])
+
+    def capture_git(cwd, _options):
+        assert cwd == "/repo"
+        events.append("git")
+        return {"observed_at_capture": True, "root": cwd}
+
+    def hydrate(selected):
+        assert selected == [entry]
+        events.append("grpc")
+        return selected
+
+    monkeypatch.setattr(context, "capture_git_context", capture_git)
+    monkeypatch.setattr(cli.atuin, "hydrate_outputs", hydrate)
+
+    result = runner.invoke(cli.app, ["1", "--print"])
+
+    assert result.exit_code == 0, result.stderr
+    assert events == ["git", "grpc"]
+    assert '<git observed_at_capture="true" root="/repo"' in result.stdout

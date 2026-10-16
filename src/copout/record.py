@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, NotRequired, TypedDict
 
 from . import context as context_capture
-from .atuin import AtuinError, HistoryEntry, recent_entries
+from .atuin import AtuinError, HistoryEntry, hydrate_outputs, recent_history
 from .config import ContextOptions
 
 SCHEMA_VERSION = 9
@@ -69,16 +70,22 @@ class CopoutRecord(TypedDict):
     environment: NotRequired[context_capture.EnvironmentContext]
 
 
-def _metadata(context_options: ContextOptions | None = None) -> CaptureMetadata:
+@dataclass(frozen=True, slots=True)
+class ContextSnapshot:
+    """Current context observed before command-output retrieval starts."""
+
+    environment: context_capture.EnvironmentContext
+    git_by_cwd: dict[str, context_capture.GitContext | None]
+
+
+def _metadata(environment: context_capture.EnvironmentContext) -> CaptureMetadata:
     metadata: CaptureMetadata = {
         "version": SCHEMA_VERSION,
         "source": "atuin",
         "captured_at": datetime.now().astimezone().isoformat(timespec="seconds"),
     }
-    if context_options is not None:
-        environment = context_capture.capture_environment(context_options)
-        if environment:
-            metadata["environment"] = environment
+    if environment:
+        metadata["environment"] = environment
     return metadata
 
 
@@ -141,33 +148,44 @@ def _git_context(
     return context_capture.capture_git_context(entry.cwd, options)
 
 
+def capture_context(
+    entries: list[HistoryEntry], context_options: ContextOptions | None
+) -> ContextSnapshot:
+    """Snapshot all subprocess-dependent context before entering gRPC."""
+    environment: context_capture.EnvironmentContext = {}
+    if context_options is not None:
+        environment = context_capture.capture_environment(context_options)
+    git_by_cwd: dict[str, context_capture.GitContext | None] = {}
+    for entry in entries:
+        if entry.cwd not in git_by_cwd:
+            git_by_cwd[entry.cwd] = _git_context(entry, context_options)
+    return ContextSnapshot(environment=environment, git_by_cwd=git_by_cwd)
+
+
 def build_record_from_entries(
     entries: list[HistoryEntry],
     *,
     context_options: ContextOptions | None = None,
+    snapshot: ContextSnapshot | None = None,
 ) -> CopoutRecord:
     """Build one schema-v9 capture envelope from chronological entries."""
     if not entries:
         raise ValueError("a Copout record requires at least one run")
 
-    git_by_cwd: dict[str, context_capture.GitContext | None] = {}
-    runs: list[RunRecord] = []
-    for entry in entries:
-        if entry.cwd not in git_by_cwd:
-            git_by_cwd[entry.cwd] = _git_context(entry, context_options)
-        runs.append(_entry_record(entry, git_by_cwd[entry.cwd]))
-
+    captured = snapshot if snapshot is not None else capture_context(entries, context_options)
+    runs = [_entry_record(entry, captured.git_by_cwd.get(entry.cwd)) for entry in entries]
     return {
-        **_metadata(context_options),
+        **_metadata(captured.environment),
         "runs": runs,
     }
 
 
 def build_record(*, context_options: ContextOptions | None = None) -> CopoutRecord:
-    entries = recent_entries(1)
+    entries = recent_history(1)
     if not entries:
         raise AtuinError("no previous non-copout command found in the current Atuin session")
-    return build_record_from_entries(entries, context_options=context_options)
+    snapshot = capture_context(entries, context_options)
+    return build_record_from_entries(hydrate_outputs(entries), snapshot=snapshot)
 
 
 def build_history(
@@ -176,9 +194,11 @@ def build_history(
     failed_only: bool = False,
     context_options: ContextOptions | None = None,
 ) -> CopoutRecord:
-    entries = recent_entries(count, failed_only=failed_only)
+    entries = recent_history(count, failed_only=failed_only)
     if not entries:
         qualifier = "failed " if failed_only else ""
         raise AtuinError(f"no {qualifier}non-copout commands found in the current Atuin session")
-    entries.reverse()
-    return build_record_from_entries(entries, context_options=context_options)
+    snapshot = capture_context(entries, context_options)
+    hydrated = hydrate_outputs(entries)
+    hydrated.reverse()
+    return build_record_from_entries(hydrated, snapshot=snapshot)

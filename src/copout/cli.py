@@ -246,11 +246,9 @@ def run_pick(
         return error_code
 
     try:
+        snapshot = record.capture_context(selected, context_options)
         hydrated = atuin.hydrate_outputs(selected)
-        captured = record.build_record_from_entries(
-            hydrated,
-            context_options=context_options,
-        )
+        captured = record.build_record_from_entries(hydrated, snapshot=snapshot)
         return _write_record(
             captured,
             writer=writer,

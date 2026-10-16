@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Snapshot Git and environment context before opening the Atuin gRPC client, avoiding macOS gRPC fork-handler diagnostics during normal command capture while preserving Git metadata.
+
 ## 0.12.0 - 2026-10-15
 
 ### Fixed
