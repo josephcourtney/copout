@@ -200,3 +200,66 @@ def test_historical_commands_keep_atuin_facts_separate_from_current_git(
         "2020-01-02 03:04:05",
         "2020-01-03 04:05:06",
     ]
+
+
+def test_single_capture_snapshots_git_before_daemon_output(monkeypatch) -> None:
+    entries = [HistoryEntry("1", "build", "/repo", exit_status=0)]
+    events: list[str] = []
+    monkeypatch.setattr(record, "recent_history", lambda count: entries)
+
+    def capture_environment(_options: ContextOptions):
+        events.append("environment")
+        return {"os": "macos"}
+
+    def capture_git(cwd: str, _options: ContextOptions):
+        assert cwd == "/repo"
+        events.append("git")
+        return {"observed_at_capture": True, "root": "/repo", "branch": "main"}
+
+    def hydrate(selected):
+        assert selected == entries
+        events.append("grpc")
+        return [HistoryEntry("1", "build", "/repo", output="built")]
+
+    monkeypatch.setattr(record.context_capture, "capture_environment", capture_environment)
+    monkeypatch.setattr(record.context_capture, "capture_git_context", capture_git)
+    monkeypatch.setattr(record, "hydrate_outputs", hydrate)
+
+    captured = record.build_record(context_options=ContextOptions())
+
+    assert events == ["environment", "git", "grpc"]
+    assert captured["environment"] == {"os": "macos"}
+    assert captured["runs"][0]["context"]["git"]["branch"] == "main"
+    assert captured["runs"][0]["output"]["text"] == "built"
+
+
+def test_multi_capture_uses_one_pre_hydration_snapshot_per_directory(monkeypatch) -> None:
+    entries = [
+        HistoryEntry("3", "newest", "/repo", exit_status=1),
+        HistoryEntry("2", "middle", "/elsewhere", exit_status=1),
+        HistoryEntry("1", "oldest", "/repo", exit_status=0),
+    ]
+    events: list[str] = []
+    monkeypatch.setattr(record, "recent_history", lambda count, *, failed_only=False: entries)
+
+    def capture_git(cwd: str, _options: ContextOptions):
+        events.append(f"git:{cwd}")
+        return {"observed_at_capture": True, "root": cwd}
+
+    def hydrate(selected):
+        events.append("grpc")
+        assert selected is entries
+        return selected
+
+    monkeypatch.setattr(record.context_capture, "capture_git_context", capture_git)
+    monkeypatch.setattr(record, "hydrate_outputs", hydrate)
+
+    captured = record.build_history(count=3, failed_only=True, context_options=ContextOptions())
+
+    assert events == ["git:/repo", "git:/elsewhere", "grpc"]
+    assert [run["history_id"] for run in captured["runs"]] == ["1", "2", "3"]
+    assert [run["context"]["git"]["root"] for run in captured["runs"]] == [
+        "/repo",
+        "/elsewhere",
+        "/repo",
+    ]

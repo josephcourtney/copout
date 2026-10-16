@@ -3,14 +3,21 @@ from __future__ import annotations
 import json
 from xml.etree import ElementTree
 
+import pytest
+
 from copout import record, render
 from copout.atuin import AtuinError, HistoryEntry
+
+
+@pytest.fixture(autouse=True)
+def no_live_daemon(monkeypatch) -> None:
+    monkeypatch.setattr(record, "hydrate_outputs", lambda entries: entries)
 
 
 def test_build_record(monkeypatch) -> None:
     monkeypatch.setattr(
         record,
-        "recent_entries",
+        "recent_history",
         lambda count: [
             HistoryEntry(
                 "id1",
@@ -40,7 +47,7 @@ def test_build_record(monkeypatch) -> None:
 
 def test_single_run_builders_share_the_same_envelope(monkeypatch) -> None:
     entry = HistoryEntry("id", "echo hi", "/tmp", 0, 0.1, "", "hi\n")
-    monkeypatch.setattr(record, "recent_entries", lambda count, *, failed_only=False: [entry])
+    monkeypatch.setattr(record, "recent_history", lambda count, *, failed_only=False: [entry])
 
     latest = record.build_record()
     counted = record.build_history(count=1)
@@ -53,7 +60,7 @@ def test_single_run_builders_share_the_same_envelope(monkeypatch) -> None:
 
 
 def test_build_record_rejects_empty_history(monkeypatch) -> None:
-    monkeypatch.setattr(record, "recent_entries", lambda count: [])
+    monkeypatch.setattr(record, "recent_history", lambda count: [])
 
     try:
         record.build_record()
@@ -66,7 +73,7 @@ def test_build_record_rejects_empty_history(monkeypatch) -> None:
 def test_build_history_uses_same_universal_envelope(monkeypatch) -> None:
     monkeypatch.setattr(
         record,
-        "recent_entries",
+        "recent_history",
         lambda count, *, failed_only=False: [
             HistoryEntry("id1", "echo hi", "/tmp", 0, 0.1, "", "hi\n"),
             HistoryEntry("id2", "true", "/tmp", 0, 0.1, "", None),
@@ -89,7 +96,7 @@ def test_build_history_uses_same_universal_envelope(monkeypatch) -> None:
 def test_render_json_uses_semantic_output(monkeypatch) -> None:
     monkeypatch.setattr(
         record,
-        "recent_entries",
+        "recent_history",
         lambda count: [HistoryEntry("id1", "echo hi", "/tmp", 0, 0.1, "", "hi\n   ")],
     )
     rendered = render.render(record.build_record(), as_json=True)
@@ -111,7 +118,7 @@ def test_render_json_uses_semantic_output(monkeypatch) -> None:
 def test_render_xml_is_compact_semantic_context(monkeypatch) -> None:
     monkeypatch.setattr(
         record,
-        "recent_entries",
+        "recent_history",
         lambda count: [
             HistoryEntry("id1", "echo <x>", "/tmp", 0, 0.10200000000000001, "", "<x>\n   ")
         ],
@@ -147,7 +154,7 @@ def test_one_run_xml_uses_same_envelope_and_includes_history_id() -> None:
 def test_xml_attribute_pretty_printing_is_opt_in(monkeypatch) -> None:
     monkeypatch.setattr(
         record,
-        "recent_entries",
+        "recent_history",
         lambda count: [HistoryEntry("id", "echo hi", "/tmp", 0, 0.121, "", "hi\n")],
     )
     compact = render.render(record.build_record())
@@ -166,7 +173,7 @@ def test_xml_attribute_pretty_printing_is_opt_in(monkeypatch) -> None:
 def test_xml_exposes_recorded_at(monkeypatch) -> None:
     monkeypatch.setattr(
         record,
-        "recent_entries",
+        "recent_history",
         lambda count: [
             HistoryEntry("id", "echo hi", "/tmp", 0, 0.1, "2026-10-01T09:30:00-04:00", "hi\n")
         ],
@@ -183,7 +190,7 @@ def test_xml_round_trips_controls_and_attribute_whitespace(monkeypatch) -> None:
     cwd = "/tmp/tab\tnewline\ncarriage\rcontrol\x01"
     output = "\x00\x01\x1b\ufffe\uffff\r\n]]> café"
     monkeypatch.setattr(
-        record, "recent_entries", lambda count: [HistoryEntry("id", command, cwd, output=output)]
+        record, "recent_history", lambda count: [HistoryEntry("id", command, cwd, output=output)]
     )
     root = ElementTree.fromstring(render.render(record.build_record()))
     run = root.find("run")
@@ -207,7 +214,7 @@ def test_xml_round_trips_controls_and_attribute_whitespace(monkeypatch) -> None:
 def test_xml_plain_text_and_cdata_terminator_round_trip(monkeypatch) -> None:
     text = "café\n\t]]> & < >"
     monkeypatch.setattr(
-        record, "recent_entries", lambda count: [HistoryEntry("id", text, output=text)]
+        record, "recent_history", lambda count: [HistoryEntry("id", text, output=text)]
     )
     root = ElementTree.fromstring(render.render(record.build_record()))
     for name in ("command", "output"):
@@ -227,7 +234,7 @@ def test_normal_capture_metadata_stays_sparse(monkeypatch) -> None:
         output_total_bytes=3,
         output_exit_capture_complete=True,
     )
-    monkeypatch.setattr(record, "recent_entries", lambda count: [entry])
+    monkeypatch.setattr(record, "recent_history", lambda count: [entry])
 
     output = ElementTree.fromstring(render.render(record.build_record())).find("run/output")
 
@@ -245,7 +252,7 @@ def test_extended_capture_metadata_is_emitted_for_incomplete_output(monkeypatch)
         output_total_bytes=30,
         output_exit_capture_complete=False,
     )
-    monkeypatch.setattr(record, "recent_entries", lambda count: [entry])
+    monkeypatch.setattr(record, "recent_history", lambda count: [entry])
 
     output = ElementTree.fromstring(render.render(record.build_record())).find("run/output")
 
@@ -262,7 +269,7 @@ def test_extended_capture_metadata_is_emitted_for_incomplete_output(monkeypatch)
 
 
 def test_unavailable_capture_metadata_is_unknown(monkeypatch) -> None:
-    monkeypatch.setattr(record, "recent_entries", lambda count: [HistoryEntry("id", "true")])
+    monkeypatch.setattr(record, "recent_history", lambda count: [HistoryEntry("id", "true")])
     output = record.build_record()["runs"][0]["output"]
     assert output["completeness"] == "unavailable"
     assert output["truncated"] is None
