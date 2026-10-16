@@ -259,5 +259,7 @@ def test_multi_capture_uses_one_pre_hydration_snapshot_per_directory(monkeypatch
     assert events == ["git:/repo", "git:/elsewhere", "grpc"]
     assert [run["history_id"] for run in captured["runs"]] == ["1", "2", "3"]
     assert [run["context"]["git"]["root"] for run in captured["runs"]] == [
-        "/repo", "/elsewhere", "/repo"
+        "/repo",
+        "/elsewhere",
+        "/repo",
     ]
