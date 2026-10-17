@@ -98,9 +98,7 @@ def _write_record(
         report = capture_diagnostics.inspect(
             captured, projected, rendered, requested=requested, expected_ids=expected_ids
         )
-        sys.stderr.write(
-            capture_diagnostics.format_report(report, verbose=diagnostics_verbose)
-        )
+        sys.stderr.write(capture_diagnostics.format_report(report, verbose=diagnostics_verbose))
         if check and report.check_failed:
             # Never replace clipboard contents or print an incomplete document.
             return 4
@@ -367,11 +365,14 @@ def cli(
         bool, typer.Option("--markdown", help="Emit readable Markdown instead of XML.")
     ] = False,
     diagnostics: Annotated[
-        bool, typer.Option("--diagnostics", help="Print capture inventory and integrity findings to stderr.")
+        bool,
+        typer.Option("--diagnostics", help="Print capture inventory and integrity findings to stderr."),
     ] = False,
     diagnostics_verbose: Annotated[
         bool,
-        typer.Option("--diagnostics-verbose", help="Print per-command capture sizes and findings."),
+        typer.Option(
+            "--diagnostics-verbose", help="Print per-command capture sizes and findings."
+        ),
     ] = False,
     check: Annotated[
         bool, typer.Option("--check", help="Reject missing or incomplete captures (exit 4).")
@@ -602,11 +603,14 @@ def pick_command(
         bool, typer.Option("--markdown", help="Emit readable Markdown instead of XML.")
     ] = False,
     diagnostics: Annotated[
-        bool, typer.Option("--diagnostics", help="Print capture inventory and integrity findings to stderr.")
+        bool,
+        typer.Option("--diagnostics", help="Print capture inventory and integrity findings to stderr."),
     ] = False,
     diagnostics_verbose: Annotated[
         bool,
-        typer.Option("--diagnostics-verbose", help="Print per-command capture sizes and findings."),
+        typer.Option(
+            "--diagnostics-verbose", help="Print per-command capture sizes and findings."
+        ),
     ] = False,
     check: Annotated[
         bool, typer.Option("--check", help="Reject missing or incomplete captures (exit 4).")
