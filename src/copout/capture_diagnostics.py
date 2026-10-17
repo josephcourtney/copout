@@ -98,7 +98,7 @@ def inspect(
         issues.append(Issue("error", "selected-history-id-mismatch"))
 
     stats: list[RunStats] = []
-    for index, (raw, shown) in enumerate(zip(original_runs, presented_runs), start=1):
+    for index, (raw, shown) in enumerate(zip(original_runs, presented_runs, strict=False), start=1):
         if raw["history_id"] != shown["history_id"] or raw["command"] != shown["command"]:
             issues.append(Issue("error", "projection-identity-mismatch", index))
         command = raw["command"]
@@ -120,6 +120,13 @@ def inspect(
             issues.append(Issue("partial", "output-unavailable", index))
         elif source["state"] != "captured":
             issues.append(Issue("error", "unknown-output-state", index))
+        if (
+            source["state"] == "captured"
+            and source["completeness"] == "unavailable"
+            or source["state"] == "unavailable"
+            and source["completeness"] != "unavailable"
+        ):
+            issues.append(Issue("error", "invalid-completeness-state", index))
         if source["completeness"] == "incomplete" or source["truncated"] is True:
             issues.append(Issue("partial", "upstream-incomplete", index))
         # Do not double-count a known incomplete snapshot.
