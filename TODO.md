@@ -1,5 +1,15 @@
 # TODO
 
+## Capture diagnostics (feature branch)
+
+- [x] Implement opt-in capture inventory and per-run statistics outside the schema-v9 payload.
+- [x] Distinguish invalid structure, demonstrably partial capture, and advisory upstream-coverage signals.
+- [x] Reuse a single rendering projection and preserve clean default stdout/clipboard behavior.
+- [x] Reject strict-check failures before starting clipboard delivery; use exit status 4.
+- [x] Cover pure report logic, presentation-budget omissions, and major CLI paths with regression tests.
+- [x] Document design, limitations, user options, and macOS qualification instructions.
+- [ ] Execute `just check` and the live Atuin smoke matrix on macOS before merge.
+
 ## 0.12.0 release candidate (schema v9)
 
 - [x] Preserve the v8 universal capture envelope while advancing the terminal-output contract to schema v9.
