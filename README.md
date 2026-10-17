@@ -80,6 +80,21 @@ Picker discovery reads only Atuin history metadata. Copout asks the daemon for o
 Copout retrieves persisted chronological history with `atuin history list --session` and retrieves recent captured output from the Atuin daemon through Jerakeen. It does not access Atuin's private database or implement the daemon gRPC protocol itself.
 
 ## Presentation behavior
+## Capture integrity diagnostics
+
+`--diagnostics` prints a concise inventory to **stderr** without changing the copied or printed XML, JSON, or Markdown. It reports assembled commands, captured/nonempty/unavailable outputs, raw versus presented UTF-8 sizes, Copout omissions, and anomalies. `--diagnostics-verbose` adds per-run byte/line counts and findings but never prints the command or output contents.
+
+`--check` performs the same checks and returns exit code **4** without printing or starting the clipboard helper when any requested selection is missing, an output snapshot is unavailable, upstream capture is known incomplete, Copout omitted presented output, or structural metadata is invalid. On success, delivery proceeds normally. Advisory PTY-traffic coverage warnings and **unknown** upstream completeness do not fail the check; therefore success does not prove a complete terminal transcript.
+
+```console
+copout 1 3 --diagnostics --print
+copout -n 5 --diagnostics-verbose --markdown
+copout 2-4 --check
+```
+
+Diagnostics are opt-in, content-free, and never embedded into schema v9. See [the capture diagnostics design and qualification guide](docs/CAPTURE_DIAGNOSTICS.md).
+
+
 
 Copout presents Atuin's retained terminal snapshot as safe plain text across XML, JSON, and Markdown. It removes ANSI styling and interprets common carriage-return, backspace, cursor, and erase-line redraws. Internal newlines are retained, while terminal-end padding is removed. This normalization cannot recover scrollback or earlier output absent from Atuin's stored snapshot.
 
