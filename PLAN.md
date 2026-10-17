@@ -7,6 +7,13 @@ Copout is a small, invocation-driven adapter around Atuin. Atuin owns persisted 
 The **0.12.0 release candidate** incorporates the merged schema-v9 and optional hardening work. It passed macOS release qualification on October 15 at commit `7ea18711ab73fbca4eaea25694768d43ec68ea79`. The release changelog and GitHub release notes have been finalized following explicit release authorization. Tag creation and GitHub publication are separate operations and must be verified independently.
 
 ## Completed implementation
+## In-development: capture integrity diagnostics
+
+The `feature/capture-integrity-diagnostics` branch adds opt-in stderr reporting and strict pre-delivery validation. It compares selection intent, the raw schema-v9 record, the terminal-normalized/budgeted projection, and the final document length. It distinguishes structural defects, known missing/incomplete captured output, and non-failing heuristic warnings. Normal invocations remain silent; the serialized schema is unchanged.
+
+The implementation and regression tests are committed for review but have **not** yet been qualified with `just check` or a live macOS/Atuin smoke test. See `docs/CAPTURE_DIAGNOSTICS.md` for the detailed design, acceptance criteria, and limitations.
+
+
 
 - A universal `runs` envelope for single- and multi-command captures, originally introduced in schema v8.
 - Bare picker, direct relative selectors, stable Atuin record-ID TUI preselection, empty-selection Enter, chronological multi-select, and bounded output hydration.
