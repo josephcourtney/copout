@@ -62,7 +62,9 @@ def test_upstream_incomplete_is_partial(from_exit: bool) -> None:
 
 @pytest.mark.unit
 def test_pty_traffic_discrepancy_is_advisory_only() -> None:
-    report = _inspect(atuin.HistoryEntry("id", "cmd", output="small", output_observed_bytes=1000000))
+    report = _inspect(
+        atuin.HistoryEntry("id", "cmd", output="small", output_observed_bytes=1000000)
+    )
     assert not report.check_failed
     assert any(issue.code == "upstream-coverage-suspected" for issue in report.issues)
 
