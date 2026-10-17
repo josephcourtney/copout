@@ -366,7 +366,9 @@ def cli(
     ] = False,
     diagnostics: Annotated[
         bool,
-        typer.Option("--diagnostics", help="Print capture inventory and integrity findings to stderr."),
+        typer.Option(
+            "--diagnostics", help="Print capture inventory and integrity findings to stderr."
+        ),
     ] = False,
     diagnostics_verbose: Annotated[
         bool,
@@ -604,7 +606,9 @@ def pick_command(
     ] = False,
     diagnostics: Annotated[
         bool,
-        typer.Option("--diagnostics", help="Print capture inventory and integrity findings to stderr."),
+        typer.Option(
+            "--diagnostics", help="Print capture inventory and integrity findings to stderr."
+        ),
     ] = False,
     diagnostics_verbose: Annotated[
         bool,
