@@ -49,26 +49,20 @@ def test_unavailable_output_is_partial_even_with_valid_history() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize(
-    ("kwargs", "code"),
-    [
-        ({"output_truncated": True}, "upstream-incomplete"),
-        ({"output_exit_capture_complete": False}, "upstream-incomplete"),
-    ],
-)
-def test_upstream_incomplete_is_partial(kwargs: dict, code: str) -> None:
-    report = _inspect(atuin.HistoryEntry("id", "cmd", output="test", **kwargs))
+@pytest.mark.parametrize("from_exit", [False, True])
+def test_upstream_incomplete_is_partial(from_exit: bool) -> None:
+    if from_exit:
+        entry = atuin.HistoryEntry("id", "cmd", output="test", output_exit_capture_complete=False)
+    else:
+        entry = atuin.HistoryEntry("id", "cmd", output="test", output_truncated=True)
+    report = _inspect(entry)
     assert report.check_failed
-    assert any(issue.code == code for issue in report.issues)
+    assert any(issue.code == "upstream-incomplete" for issue in report.issues)
 
 
 @pytest.mark.unit
 def test_pty_traffic_discrepancy_is_advisory_only() -> None:
-    report = _inspect(
-        atuin.HistoryEntry(
-            "id", "cmd", output="small", output_observed_bytes=1000000
-        )
-    )
+    report = _inspect(atuin.HistoryEntry("id", "cmd", output="small", output_observed_bytes=1000000))
     assert not report.check_failed
     assert any(issue.code == "upstream-coverage-suspected" for issue in report.issues)
 
@@ -88,10 +82,7 @@ def test_utf8_counts_and_per_run_presentation_truncation() -> None:
 
 @pytest.mark.unit
 def test_total_budget_truncation_is_detected() -> None:
-    entries = [
-        atuin.HistoryEntry(str(i), "cmd", output="x" * (200 * 1024))
-        for i in range(6)
-    ]
+    entries = [atuin.HistoryEntry(str(i), "cmd", output="x" * (200 * 1024)) for i in range(6)]
     report = _inspect(*entries)
     assert report.check_failed
     assert report.presented_bytes <= render.MAX_OUTPUT_BYTES_TOTAL
