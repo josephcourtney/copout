@@ -28,6 +28,7 @@ class RunStats:
     command_bytes: int
     command_lines: int
     captured_bytes: int
+    captured_lines: int
     presented_bytes: int
     presented_lines: int
     state: str
@@ -121,10 +122,13 @@ def inspect(
             issues.append(Issue("error", "unknown-output-state", index))
         if source["completeness"] == "incomplete" or source["truncated"] is True:
             issues.append(Issue("partial", "upstream-incomplete", index))
-        if source.get("exit_capture_complete") is False:
-            # Do not double-count a known incomplete snapshot.
-            if source["completeness"] != "incomplete" and source["truncated"] is not True:
-                issues.append(Issue("partial", "upstream-incomplete", index))
+        # Do not double-count a known incomplete snapshot.
+        if (
+            source.get("exit_capture_complete") is False
+            and source["completeness"] != "incomplete"
+            and source["truncated"] is not True
+        ):
+            issues.append(Issue("partial", "upstream-incomplete", index))
         if output.get("presentation_truncated"):
             if output.get("presentation_omitted_bytes", 0) <= 0:
                 issues.append(Issue("error", "invalid-omission-metadata", index))
@@ -141,6 +145,7 @@ def inspect(
                 command_bytes=_utf8_size(command),
                 command_lines=_line_count(command),
                 captured_bytes=raw_size,
+                captured_lines=_line_count(source["text"]),
                 presented_bytes=shown_size,
                 presented_lines=_line_count(output["text"]),
                 state=source["state"],
@@ -184,14 +189,20 @@ def format_report(report: CaptureReport, *, verbose: bool = False) -> str:
     else:
         lines.append("  findings: none (upstream completeness remains unverified)")
     if verbose:
-        for run in report.runs:
+        # Limit console volume for large history selections.
+        for run in report.runs[:100]:
             lines.append(
                 f"  run {run.index}: command={run.command_bytes} bytes/"
                 f"{run.command_lines} lines; output={run.captured_bytes} raw bytes/"
-                f"{run.presented_bytes} presented bytes/{run.presented_lines} lines; "
-                f"{run.state}, completeness={run.completeness}"
+                f"{run.captured_lines} raw lines; {run.presented_bytes} presented bytes/"
+                f"{run.presented_lines} presented lines; {run.state}, "
+                f"completeness={run.completeness}"
             )
-        for issue in report.issues:
-            if issue.run is not None:
-                lines.append(f"    run {issue.run}: {issue.severity} {issue.code}")
+        if len(report.runs) > 100:
+            lines.append(f"  ... {len(report.runs) - 100} more runs (details omitted)")
+        detailed = [issue for issue in report.issues if issue.run is not None]
+        for issue in detailed[:100]:
+            lines.append(f"    run {issue.run}: {issue.severity} {issue.code}")
+        if len(detailed) > 100:
+            lines.append(f"    ... {len(detailed) - 100} more per-run findings")
     return "\n".join(lines) + "\n"
