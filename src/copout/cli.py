@@ -86,6 +86,7 @@ def _write_record(
     check: bool = False,
     requested: int | None = None,
     expected_ids: list[str] | None = None,
+    print_output: bool = False,
 ) -> int:
     if diagnostics or diagnostics_verbose or check:
         rendered, projected = render.render_with_projection(
@@ -111,6 +112,16 @@ def _write_record(
             pretty_attributes=pretty_attributes,
         )
     if writer is None:
+        if check and not print_output:
+            # Defer clipboard startup until after strict validation succeeds.
+            delayed, error_code = _start_writer(print_output=False)
+            if error_code is not None:
+                return error_code
+            assert delayed is not None
+            try:
+                return delayed.write(rendered)
+            finally:
+                delayed.abort()
         sys.stdout.write(rendered)
         return 0
     return writer.write(rendered)
@@ -182,7 +193,7 @@ def run(
     diagnostics_verbose: bool = False,
     check: bool = False,
 ) -> int:
-    writer, error_code = _start_writer(print_output=print_output)
+    writer, error_code = (None, None) if check else _start_writer(print_output=print_output)
     if error_code is not None:
         return error_code
 
@@ -209,6 +220,7 @@ def run(
             diagnostics_verbose=diagnostics_verbose,
             check=check,
             requested=count,
+            print_output=print_output,
         )
     finally:
         if writer is not None:
@@ -276,7 +288,7 @@ def run_pick(
     except record.AtuinError as exc:
         return _report_atuin_error(exc)
 
-    writer, error_code = _start_writer(print_output=print_output)
+    writer, error_code = (None, None) if check else _start_writer(print_output=print_output)
     if error_code is not None:
         return error_code
 
@@ -295,6 +307,7 @@ def run_pick(
             check=check,
             requested=len(selected),
             expected_ids=[entry.id for entry in selected],
+            print_output=print_output,
         )
     finally:
         if writer is not None:
