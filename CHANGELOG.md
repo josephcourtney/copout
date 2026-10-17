@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+
+### Added
+
+- Add opt-in `--diagnostics`, `--diagnostics-verbose`, and strict `--check` for capture inventory, presentation byte accounting, missing output, selection integrity, and upstream/formatter omissions; emit reports only to stderr.
+- Reuse each rendered projection for diagnostics without recapturing history, and defer clipboard startup until strict checks pass.
+
+
 ### Fixed
 
 - Snapshot Git and environment context before opening the Atuin gRPC client, avoiding macOS gRPC fork-handler diagnostics during normal command capture while preserving Git metadata.
