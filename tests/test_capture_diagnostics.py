@@ -25,7 +25,8 @@ def test_no_defect_does_not_claim_proven_completeness() -> None:
     assert report.captured == report.nonempty == 1
     assert report.unavailable == report.omitted_bytes == 0
     assert report.command_bytes == len("echo hi")
-    assert report.captured_bytes == report.presented_bytes == 3
+    assert report.captured_bytes == 3
+    assert report.presented_bytes == 2  # Terminal presentation removes trailing padding.
     assert "upstream completeness remains unverified" in capture_diagnostics.format_report(report)
 
 
