@@ -8,7 +8,9 @@
 - [x] Reject strict-check failures before starting clipboard delivery; use exit status 4.
 - [x] Cover pure report logic, presentation-budget omissions, and major CLI paths with regression tests.
 - [x] Document design, limitations, user options, and macOS qualification instructions.
-- [ ] Execute `just check` and the live Atuin smoke matrix on macOS before merge.
+- [x] Diagnose initial macOS `just check`: 202 passed; 11 live failures all from old Jerakeen missing Atuin 18.24.1 build metadata.
+- [x] Update Copout to pinned Jerakeen build-gated 18.24.1 implementation.
+- [ ] Run `uv sync`, `just check`, and the live Atuin smoke matrix on macOS after the pin update before merge.
 
 ## 0.12.0 release candidate (schema v9)
 

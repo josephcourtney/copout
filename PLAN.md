@@ -10,7 +10,7 @@ The **0.12.0 release candidate** incorporates the merged schema-v9 and optional 
 
 The `feature/capture-integrity-diagnostics` branch adds opt-in stderr reporting and strict pre-delivery validation. It compares selection intent, the raw schema-v9 record, the terminal-normalized/budgeted projection, and the final document length. It distinguishes structural defects, known missing/incomplete captured output, and non-failing heuristic warnings. Normal invocations remain silent; the serialized schema is unchanged.
 
-The implementation and regression tests are committed for review but have **not** yet been qualified with `just check` or a live macOS/Atuin smoke test. See `docs/CAPTURE_DIAGNOSTICS.md` for the detailed design, acceptance criteria, and limitations.
+Implementation and regression tests are committed for review. Initial macOS `just check` reported 202 passing tests and 11 failed live cases, all due to Atuin 18.24.1 build-header refusal by the older Jerakeen pin. The branch now includes a replacement Jerakeen revision with the updated protocol snapshot and build header, but this updated integration has **not** yet been qualified with a fresh `just check` or live macOS/Atuin smoke test. See `docs/CAPTURE_DIAGNOSTICS.md` for the detailed design, acceptance criteria, and limitations.
 
 ## Completed implementation
 

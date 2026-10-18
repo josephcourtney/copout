@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+
+- Pin Jerakeen to the Atuin 18.24.1 build-gated gRPC implementation, restoring command-output retrieval against the exact upstream release; avoid misreporting the removed numeric protocol identifier in doctor output.
+
+
 
 ### Added
 
