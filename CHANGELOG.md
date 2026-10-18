@@ -4,6 +4,18 @@
 
 ### Fixed
 
+- Pin Jerakeen to the Atuin 18.24.1 build-gated gRPC implementation, restoring command-output retrieval against the exact upstream release; avoid misreporting the removed numeric protocol identifier in doctor output.
+
+
+
+### Added
+
+- Add opt-in `--diagnostics`, `--diagnostics-verbose`, and strict `--check` for capture inventory, presentation byte accounting, missing output, selection integrity, and upstream/formatter omissions; emit reports only to stderr.
+- Reuse each rendered projection for diagnostics without recapturing history, and defer clipboard startup until strict checks pass.
+
+
+### Fixed
+
 - Snapshot Git and environment context before opening the Atuin gRPC client, avoiding macOS gRPC fork-handler diagnostics during normal command capture while preserving Git metadata.
 - Update the pinned Jerakeen dependency to its Atuin 18.24 / protocol-5 compatible commit, restoring command-output retrieval on protocol-5 daemons.
 

@@ -7,7 +7,7 @@ Copout does **not** run a terminal watcher, maintain its own command journal, or
 ## Requirements
 
 - Python 3.13+
-- Atuin 18.23.x on `PATH`
+- Atuin **18.24.1** on `PATH` (Jerakeen sends the exact `18.24.1` build identity)
 - Atuin shell integration
 - For command output: Atuin daemon + `pty-proxy` + output capture enabled
 - macOS `pbcopy`, Wayland `wl-copy`, or X11 `xclip`/`xsel`
@@ -22,7 +22,7 @@ Use Atuin's own output-capture setup command:
 atuin config enable output-capture
 ```
 
-On Atuin 18.23 this enables the daemon when necessary, enables `pty_proxy.enabled` and `output.enabled`, and restarts an autostart-managed daemon so the capture backend picks up the new configuration. Follow any restart instructions printed by Atuin, then open a new shell.
+On supported Atuin versions this enables the daemon when necessary, enables `pty_proxy.enabled` and `output.enabled`, and restarts an autostart-managed daemon so the capture backend picks up the new configuration. Follow any restart instructions printed by Atuin, then open a new shell.
 
 Run a command and verify the complete path:
 
@@ -78,6 +78,24 @@ Formatting, output-delivery, and context options are orthogonal to selection. Op
 Picker discovery reads only Atuin history metadata. Copout asks the daemon for output only after the selection is known, and then only for the selected commands. The Textual UI is imported only when an interactive picker is actually opened. Picker drawing is routed to the controlling terminal rather than structured stdout, so redirected semantic output remains clean after confirmation. A bare or preselected interactive invocation without a controlling terminal fails explicitly rather than silently changing selection behavior; scripts should use positional selectors, `-n`, or `--failure`.
 
 Copout retrieves persisted chronological history with `atuin history list --session` and retrieves recent captured output from the Atuin daemon through Jerakeen. It does not access Atuin's private database or implement the daemon gRPC protocol itself.
+
+## Atuin 18.24.1 compatibility
+
+Copout pins a Jerakeen revision that vendors the Atuin 18.24.1 wire contract and adds the required `x-atuin-build` gRPC metadata to every request. Atuin refuses clients whose announced build differs from the daemon; older or locally compiled `18.24.1+SHA` daemons are not supported by this pin. This is deliberately not bypassed by echoing the daemon's build header. If outputs are unavailable with a build mismatch, run `copout doctor` and check the installed Atuin daemon version.
+
+## Capture integrity diagnostics
+
+`--diagnostics` prints a concise inventory to **stderr** without changing the copied or printed XML, JSON, or Markdown. It reports assembled commands, captured/nonempty/unavailable outputs, raw versus presented UTF-8 sizes, Copout omissions, and anomalies. `--diagnostics-verbose` adds per-run byte/line counts and findings but never prints the command or output contents.
+
+`--check` performs the same checks and returns exit code **4** without printing or starting the clipboard helper when any requested selection is missing, an output snapshot is unavailable, upstream capture is known incomplete, Copout omitted presented output, or structural metadata is invalid. On success, delivery proceeds normally. Advisory PTY-traffic coverage warnings and **unknown** upstream completeness do not fail the check; therefore success does not prove a complete terminal transcript.
+
+```console
+copout 1 3 --diagnostics --print
+copout -n 5 --diagnostics-verbose --markdown
+copout 2-4 --check
+```
+
+Diagnostics are opt-in, content-free, and never embedded into schema v9. See [the capture diagnostics design and qualification guide](docs/CAPTURE_DIAGNOSTICS.md).
 
 ## Presentation behavior
 
