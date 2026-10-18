@@ -22,7 +22,7 @@
   dependencies = [
     "typer>=0.12",
     "textual>=8.2.8,<9",
-    "jerakeen @ git+https://github.com/josephcourtney/jerakeen.git@bd26ac17ab764f3a8abb86aeef2dead0729371b2",
+    "jerakeen @ git+https://github.com/josephcourtney/jerakeen.git@ebfbc1f2a7b40003dec9347e019f67d3df4c1d33",
   ]
 
   [project.scripts]

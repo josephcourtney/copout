@@ -41,7 +41,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "jerakeen", git = "https://github.com/josephcourtney/jerakeen.git?rev=bd26ac17ab764f3a8abb86aeef2dead0729371b2" },
+    { name = "jerakeen", git = "https://github.com/josephcourtney/jerakeen.git?rev=ebfbc1f2a7b40003dec9347e019f67d3df4c1d33" },
     { name = "textual", specifier = ">=8.2.8,<9" },
     { name = "typer", specifier = ">=0.12" },
 ]
@@ -192,7 +192,7 @@ wheels = [
 [[package]]
 name = "jerakeen"
 version = "0.10.0"
-source = { git = "https://github.com/josephcourtney/jerakeen.git?rev=bd26ac17ab764f3a8abb86aeef2dead0729371b2#bd26ac17ab764f3a8abb86aeef2dead0729371b2" }
+source = { git = "https://github.com/josephcourtney/jerakeen.git?rev=ebfbc1f2a7b40003dec9347e019f67d3df4c1d33#ebfbc1f2a7b40003dec9347e019f67d3df4c1d33" }
 dependencies = [
     { name = "grpcio" },
     { name = "protobuf" },
