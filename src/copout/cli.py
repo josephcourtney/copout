@@ -506,6 +506,67 @@ def recent_command(
     pretty_attributes: Annotated[
         bool, typer.Option("--pretty-attributes", help="Format XML attributes on separate lines.")
     ] = False,
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Read context settings from this TOML file."),
+    ] = None,
+    context_enabled: Annotated[
+        bool | None,
+        typer.Option("--context/--no-context", help="Enable or disable all extra context."),
+    ] = None,
+    git_context: Annotated[
+        bool | None,
+        typer.Option(
+            "--git-context/--no-git-context", help="Include current Git state for each cwd."
+        ),
+    ] = None,
+    git_extended: Annotated[
+        bool | None,
+        typer.Option(
+            "--git-extended/--no-git-extended",
+            help="Include upstream, divergence, remote, and changed files.",
+        ),
+    ] = None,
+    git_diff: Annotated[
+        bool | None,
+        typer.Option("--git-diff/--no-git-diff", help="Include a bounded working-tree Git diff."),
+    ] = None,
+    system_context: Annotated[
+        bool | None,
+        typer.Option(
+            "--system-context/--no-system-context",
+            help="Include shell, platform, architecture, and Atuin session.",
+        ),
+    ] = None,
+    hostname_context: Annotated[
+        bool | None,
+        typer.Option("--hostname-context/--no-hostname-context", help="Include the hostname."),
+    ] = None,
+    shell_version: Annotated[
+        bool | None,
+        typer.Option("--shell-version/--no-shell-version", help="Include the login-shell version."),
+    ] = None,
+    os_version: Annotated[
+        bool | None,
+        typer.Option("--os-version/--no-os-version", help="Include the OS release/version."),
+    ] = None,
+    python_context: Annotated[
+        bool | None,
+        typer.Option(
+            "--python-context/--no-python-context",
+            help="Include Python interpreter/environment details.",
+        ),
+    ] = None,
+    env_vars: Annotated[
+        list[str] | None,
+        typer.Option("--env", help="Include this environment variable; repeat as needed."),
+    ] = None,
+    executables: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--resolve", help="Include the resolved path of this executable; repeat as needed."
+        ),
+    ] = None,
 ) -> None:
     """Copy the latest COUNT eligible commands without opening the picker."""
     inherited = _root_options(ctx)
@@ -515,19 +576,20 @@ def recent_command(
         raise typer.BadParameter("--json and --markdown cannot be combined")
     if inherited.preselect or inherited.preselect_records or inherited.last is not None:
         raise typer.BadParameter("a positional count cannot be combined with preselection or --last")
-    options = _context_options(
-        config_path=inherited.config_path,
-        context_enabled=inherited.context_enabled,
-        git_context=inherited.git_context,
-        git_extended=inherited.git_extended,
-        git_diff=inherited.git_diff,
-        system_context=inherited.system_context,
-        hostname_context=inherited.hostname_context,
-        shell_version=inherited.shell_version,
-        os_version=inherited.os_version,
-        python_context=inherited.python_context,
-        env_vars=inherited.env_vars,
-        executables=inherited.executables,
+    options = _merged_context_options(
+        inherited,
+        config_path=config_path,
+        context_enabled=context_enabled,
+        git_context=git_context,
+        git_extended=git_extended,
+        git_diff=git_diff,
+        system_context=system_context,
+        hostname_context=hostname_context,
+        shell_version=shell_version,
+        os_version=os_version,
+        python_context=python_context,
+        env_vars=env_vars or [],
+        executables=executables or [],
     )
     raise typer.Exit(
         run(
