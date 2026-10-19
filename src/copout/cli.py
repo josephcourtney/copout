@@ -16,7 +16,9 @@ class SelectorGroup(TyperGroup):
     """Route selector-shaped command tokens to the picker command."""
 
     def resolve_command(self, ctx, args):
-        if args and selection.looks_like_selector(args[0]):
+        if args and args[0].isdigit() and len(args[0]) > 0:
+            args = ["recent", *args]
+        elif args and selection.looks_like_selector(args[0]):
             args = ["pick", *args]
         return super().resolve_command(ctx, args)
 
@@ -28,7 +30,7 @@ app = typer.Typer(
     help=(
         "Copy recent structured terminal history from Atuin to the clipboard. "
         "With no selection, open the interactive picker; positional selectors such as "
-        "`1 3 5-7` select entries directly."
+        "`4` includes the four most recent commands; `1 3 5-7` selects positions."
     ),
     invoke_without_command=True,
     no_args_is_help=False,
@@ -485,6 +487,56 @@ def cli(
             as_json=as_json,
             as_markdown=as_markdown,
             pretty_attributes=pretty_attributes,
+            context_options=options,
+        )
+    )
+
+
+@app.command("recent", hidden=True)
+def recent_command(
+    ctx: typer.Context,
+    count: Annotated[int, typer.Argument(min=1, help="Number of recent commands to include.")],
+    print_output: Annotated[
+        bool, typer.Option("--print", "-p", help="Print instead of copying.")
+    ] = False,
+    as_json: Annotated[bool, typer.Option("--json", help="Emit JSON instead of XML.")] = False,
+    as_markdown: Annotated[
+        bool, typer.Option("--markdown", help="Emit readable Markdown instead of XML.")
+    ] = False,
+    pretty_attributes: Annotated[
+        bool, typer.Option("--pretty-attributes", help="Format XML attributes on separate lines.")
+    ] = False,
+) -> None:
+    """Copy the latest COUNT eligible commands without opening the picker."""
+    inherited = _root_options(ctx)
+    merged_json = as_json or inherited.as_json
+    merged_markdown = as_markdown or inherited.as_markdown
+    if merged_json and merged_markdown:
+        raise typer.BadParameter("--json and --markdown cannot be combined")
+    if inherited.preselect or inherited.preselect_records or inherited.last is not None:
+        raise typer.BadParameter("a positional count cannot be combined with preselection or --last")
+    options = _context_options(
+        config_path=inherited.config_path,
+        context_enabled=inherited.context_enabled,
+        git_context=inherited.git_context,
+        git_extended=inherited.git_extended,
+        git_diff=inherited.git_diff,
+        system_context=inherited.system_context,
+        hostname_context=inherited.hostname_context,
+        shell_version=inherited.shell_version,
+        os_version=inherited.os_version,
+        python_context=inherited.python_context,
+        env_vars=inherited.env_vars,
+        executables=inherited.executables,
+    )
+    raise typer.Exit(
+        run(
+            print_output=print_output or inherited.print_output,
+            as_json=merged_json,
+            as_markdown=merged_markdown,
+            pretty_attributes=pretty_attributes or inherited.pretty_attributes,
+            count=count,
+            failure=inherited.failure,
             context_options=options,
         )
     )
