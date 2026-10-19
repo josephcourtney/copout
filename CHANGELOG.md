@@ -1,4 +1,5 @@
 # Changelog
+- Interpret a lone positional integer (`copout 4`) as a count of recent commands, preserving explicit positional selection through `copout pick 4`.
 
 ## Unreleased
 
