@@ -311,7 +311,7 @@ def test_positional_selector_captures_git_before_grpc(monkeypatch) -> None:
 
     entry = HistoryEntry("1", "echo hi", "/repo", output="hi")
     events: list[str] = []
-    monkeypatch.setattr(cli.atuin, "recent_history", lambda limit, *, required_ids=(): [entry])
+    monkeypatch.setattr(record, "recent_history", lambda count, *, failed_only=False: [entry])
 
     def capture_git(cwd, _options):
         assert cwd == "/repo"
@@ -324,7 +324,7 @@ def test_positional_selector_captures_git_before_grpc(monkeypatch) -> None:
         return selected
 
     monkeypatch.setattr(context, "capture_git_context", capture_git)
-    monkeypatch.setattr(cli.atuin, "hydrate_outputs", hydrate)
+    monkeypatch.setattr(record, "hydrate_outputs", hydrate)
 
     result = runner.invoke(cli.app, ["1", "--print"])
 
