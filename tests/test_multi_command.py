@@ -311,7 +311,7 @@ def test_positional_selector_captures_git_before_grpc(monkeypatch) -> None:
 
     entry = HistoryEntry("1", "echo hi", "/repo", output="hi")
     events: list[str] = []
-    monkeypatch.setattr(cli.atuin, "recent_history", lambda limit, *, required_ids=(): [entry])
+    monkeypatch.setattr(record, "recent_history", lambda count, *, failed_only=False: [entry])
 
     def capture_git(cwd, _options):
         assert cwd == "/repo"
@@ -324,10 +324,59 @@ def test_positional_selector_captures_git_before_grpc(monkeypatch) -> None:
         return selected
 
     monkeypatch.setattr(context, "capture_git_context", capture_git)
-    monkeypatch.setattr(cli.atuin, "hydrate_outputs", hydrate)
+    monkeypatch.setattr(record, "hydrate_outputs", hydrate)
 
     result = runner.invoke(cli.app, ["1", "--print"])
 
     assert result.exit_code == 0, result.stderr
     assert events == ["git", "grpc"]
     assert '<git observed_at_capture="true" root="/repo"' in result.stdout
+
+
+@pytest.mark.parametrize("count, expected", [
+    (1, ["4"]),
+    (4, ["1", "2", "3", "4"]),
+    (9, ["1", "2", "3", "4"]),
+])
+def test_bare_integer_captures_count_not_offset(monkeypatch, count, expected) -> None:
+    entries = [
+        HistoryEntry(str(index), f"command-{index}", output=f"output-{index}")
+        for index in range(4, 0, -1)
+    ]
+    observed = []
+
+    def recent_history(limit, *, failed_only=False):
+        observed.append((limit, failed_only))
+        return entries[:limit]
+
+    monkeypatch.setattr(record, "recent_history", recent_history)
+    monkeypatch.setattr(record, "hydrate_outputs", lambda selected: selected)
+    result = runner.invoke(cli.app, [str(count), "--print"])
+
+    assert result.exit_code == 0, result.stderr
+    xml = ElementTree.fromstring(result.stdout)
+    assert [run.attrib["history_id"] for run in xml.findall("run")] == expected
+    assert len(xml.findall("environment")) <= 1
+    assert observed == [(count, False)]
+
+
+def test_explicit_pick_retains_single_position_semantics(monkeypatch) -> None:
+    entries = [HistoryEntry(str(i), f"command-{i}", output=f"output-{i}") for i in range(4, 0, -1)]
+    monkeypatch.setattr(cli.atuin, "recent_history", lambda limit, *, required_ids=(): entries)
+    monkeypatch.setattr(cli.atuin, "hydrate_outputs", lambda selected: selected)
+
+    result = runner.invoke(cli.app, ["pick", "4", "--print"])
+
+    assert result.exit_code == 0, result.stderr
+    assert [run.attrib["history_id"] for run in ElementTree.fromstring(result.stdout).findall("run")] == ["1"]
+
+
+def test_count_respects_root_output_flags(monkeypatch) -> None:
+    monkeypatch.setattr(record, "recent_history", lambda count, *, failed_only=False: [
+        HistoryEntry(str(i), f"command-{i}", output=f"output-{i}") for i in range(count, 0, -1)
+    ])
+    monkeypatch.setattr(record, "hydrate_outputs", lambda selected: selected)
+    for args in (["--json", "--print", "2"], ["2", "--json", "--print"]):
+        result = runner.invoke(cli.app, args)
+        assert result.exit_code == 0, result.stderr
+        assert len(json.loads(result.stdout)["runs"]) == 2

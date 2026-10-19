@@ -16,7 +16,9 @@ class SelectorGroup(TyperGroup):
     """Route selector-shaped command tokens to the picker command."""
 
     def resolve_command(self, ctx, args):
-        if args and selection.looks_like_selector(args[0]):
+        if args and args[0].isdigit() and len(args[0]) > 0:
+            args = ["recent", *args]
+        elif args and selection.looks_like_selector(args[0]):
             args = ["pick", *args]
         return super().resolve_command(ctx, args)
 
@@ -28,7 +30,7 @@ app = typer.Typer(
     help=(
         "Copy recent structured terminal history from Atuin to the clipboard. "
         "With no selection, open the interactive picker; positional selectors such as "
-        "`1 3 5-7` select entries directly."
+        "`4` includes the four most recent commands; `1 3 5-7` selects positions."
     ),
     invoke_without_command=True,
     no_args_is_help=False,
@@ -485,6 +487,118 @@ def cli(
             as_json=as_json,
             as_markdown=as_markdown,
             pretty_attributes=pretty_attributes,
+            context_options=options,
+        )
+    )
+
+
+@app.command("recent", hidden=True)
+def recent_command(
+    ctx: typer.Context,
+    count: Annotated[int, typer.Argument(min=1, help="Number of recent commands to include.")],
+    print_output: Annotated[
+        bool, typer.Option("--print", "-p", help="Print instead of copying.")
+    ] = False,
+    as_json: Annotated[bool, typer.Option("--json", help="Emit JSON instead of XML.")] = False,
+    as_markdown: Annotated[
+        bool, typer.Option("--markdown", help="Emit readable Markdown instead of XML.")
+    ] = False,
+    pretty_attributes: Annotated[
+        bool, typer.Option("--pretty-attributes", help="Format XML attributes on separate lines.")
+    ] = False,
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Read context settings from this TOML file."),
+    ] = None,
+    context_enabled: Annotated[
+        bool | None,
+        typer.Option("--context/--no-context", help="Enable or disable all extra context."),
+    ] = None,
+    git_context: Annotated[
+        bool | None,
+        typer.Option(
+            "--git-context/--no-git-context", help="Include current Git state for each cwd."
+        ),
+    ] = None,
+    git_extended: Annotated[
+        bool | None,
+        typer.Option(
+            "--git-extended/--no-git-extended",
+            help="Include upstream, divergence, remote, and changed files.",
+        ),
+    ] = None,
+    git_diff: Annotated[
+        bool | None,
+        typer.Option("--git-diff/--no-git-diff", help="Include a bounded working-tree Git diff."),
+    ] = None,
+    system_context: Annotated[
+        bool | None,
+        typer.Option(
+            "--system-context/--no-system-context",
+            help="Include shell, platform, architecture, and Atuin session.",
+        ),
+    ] = None,
+    hostname_context: Annotated[
+        bool | None,
+        typer.Option("--hostname-context/--no-hostname-context", help="Include the hostname."),
+    ] = None,
+    shell_version: Annotated[
+        bool | None,
+        typer.Option("--shell-version/--no-shell-version", help="Include the login-shell version."),
+    ] = None,
+    os_version: Annotated[
+        bool | None,
+        typer.Option("--os-version/--no-os-version", help="Include the OS release/version."),
+    ] = None,
+    python_context: Annotated[
+        bool | None,
+        typer.Option(
+            "--python-context/--no-python-context",
+            help="Include Python interpreter/environment details.",
+        ),
+    ] = None,
+    env_vars: Annotated[
+        list[str] | None,
+        typer.Option("--env", help="Include this environment variable; repeat as needed."),
+    ] = None,
+    executables: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--resolve", help="Include the resolved path of this executable; repeat as needed."
+        ),
+    ] = None,
+) -> None:
+    """Copy the latest COUNT eligible commands without opening the picker."""
+    inherited = _root_options(ctx)
+    merged_json = as_json or inherited.as_json
+    merged_markdown = as_markdown or inherited.as_markdown
+    if merged_json and merged_markdown:
+        raise typer.BadParameter("--json and --markdown cannot be combined")
+    if inherited.preselect or inherited.preselect_records or inherited.last is not None:
+        raise typer.BadParameter("a positional count cannot be combined with preselection or --last")
+    options = _merged_context_options(
+        inherited,
+        config_path=config_path,
+        context_enabled=context_enabled,
+        git_context=git_context,
+        git_extended=git_extended,
+        git_diff=git_diff,
+        system_context=system_context,
+        hostname_context=hostname_context,
+        shell_version=shell_version,
+        os_version=os_version,
+        python_context=python_context,
+        env_vars=env_vars or [],
+        executables=executables or [],
+    )
+    raise typer.Exit(
+        run(
+            print_output=print_output or inherited.print_output,
+            as_json=merged_json,
+            as_markdown=merged_markdown,
+            pretty_attributes=pretty_attributes or inherited.pretty_attributes,
+            count=count,
+            failure=inherited.failure,
             context_options=options,
         )
     )
