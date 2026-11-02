@@ -11,6 +11,7 @@ from textual.binding import Binding
 from textual.widgets import SelectionList, Static
 
 from .atuin import HistoryEntry
+from .picker_theme import detect_theme
 from .selection import SelectionError, candidate_lines
 
 
@@ -65,6 +66,7 @@ class CommandPicker(App[list[int] | None]):
         entries: Sequence[HistoryEntry],
         *,
         preselected_ids: Sequence[str] = (),
+        theme_name: str = "ansi-dark",
     ) -> None:
         # Textual reads CSS variables during App initialization.
         self._entries = list(entries)
@@ -73,7 +75,7 @@ class CommandPicker(App[list[int] | None]):
         # In particular, avoid imposing Textual's dark RGB palette on a light
         # terminal or replacing the terminal's configured accent colors.
         super().__init__(ansi_color=True)
-        self.theme = "ansi-dark"
+        self.theme = theme_name
 
     def get_css_variables(self) -> dict[str, str]:
         """Size the inline region before its first frame, without a resize redraw."""
@@ -173,7 +175,10 @@ def pick_entries(
             # controlling terminal so `copout pick -p > context.xml` stays clean.
             sys.stdin = input_stream
             sys.stdout = output_stream
-            indexes = CommandPicker(entries, preselected_ids=preselected_ids).run(
+            theme_name = detect_theme(input_stream.buffer)
+            indexes = CommandPicker(
+                entries, preselected_ids=preselected_ids, theme_name=theme_name
+            ).run(
                 inline=True,
                 inline_no_clear=False,
                 mouse=False,
