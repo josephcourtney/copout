@@ -583,6 +583,15 @@ def recent_command(
     pretty_attributes: Annotated[
         bool, typer.Option("--pretty-attributes", help="Format XML attributes on separate lines.")
     ] = False,
+    diagnostics: Annotated[
+        bool, typer.Option("--diagnostics", help="Print capture integrity findings to stderr.")
+    ] = False,
+    diagnostics_verbose: Annotated[
+        bool, typer.Option("--diagnostics-verbose", help="Print per-command capture diagnostics.")
+    ] = False,
+    check: Annotated[
+        bool, typer.Option("--check", help="Reject missing or incomplete captures (exit 4).")
+    ] = False,
     config_path: Annotated[
         Path | None,
         typer.Option("--config", help="Read context settings from this TOML file."),
@@ -679,6 +688,9 @@ def recent_command(
             count=count,
             failure=inherited.failure,
             context_options=options,
+            diagnostics=diagnostics or inherited.diagnostics,
+            diagnostics_verbose=diagnostics_verbose or inherited.diagnostics_verbose,
+            check=check or inherited.check,
         )
     )
 
