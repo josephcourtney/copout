@@ -24,7 +24,8 @@ help:
     '  just typer-compat             Test CLI across isolated Typer versions' \
     '  just benchmark-context        Time context capture versus --no-context' \
     '  just kitty-theme-check        Verify picker in isolated light/dark Kitty windows' \
-    '  just analyze-output-probe FILE Analyze an existing Copout JSON output probe'
+    '  just analyze-output-probe FILE Analyze an existing Copout JSON output probe' \
+    '  just analyze-output-edges FILE Analyze five short/rapid/redraw edge probes'
 
 setup:
   {{UV}} sync
@@ -85,3 +86,6 @@ kitty-theme-check out="/tmp/copout-picker-themes":
 
 analyze-output-probe file:
   {{PYTHON}} scripts/analyze_output_probe.py '{{file}}'
+
+analyze-output-edges file:
+  {{PYTHON}} scripts/analyze_output_edges.py '{{file}}'
