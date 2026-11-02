@@ -240,7 +240,7 @@ def test_command_preserves_history_without_output(
     [
         ("HISTORY_ERROR", "history unavailable", 3),
         ("MALFORMED_HISTORY", "unrecognized format", 3),
-        ("empty", "no recent commands are available", 2),
+        ("empty", "no previous non-copout command found", 3),
         ("session", "ATUIN_SESSION is not set", 3),
         ("atuin", "not on PATH", 3),
     ],
