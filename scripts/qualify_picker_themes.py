@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import shutil
 import subprocess
 import sys
@@ -52,13 +51,9 @@ def parse_kitty_colors(report: str) -> dict[str, str]:
     """Parse kitty.conf-style key/value lines independent of whitespace."""
     colors: dict[str, str] = {}
     for line in report.splitlines():
-        fields = line.split("#", 1)[0].split()
-        if len(fields) >= 2:
+        fields = line.strip().split()
+        if len(fields) >= 2 and not fields[0].startswith("#"):
             colors[fields[0]] = fields[1].lower()
-        else:
-            match = re.match(r"^\\s*(\\w+)\\s+(#[0-9a-fA-F]{6})\\s*$", line)
-            if match:
-                colors[match.group(1)] = match.group(2).lower()
     return colors
 
 
