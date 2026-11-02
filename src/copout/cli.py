@@ -19,9 +19,7 @@ class SelectorGroup(TyperGroup):
         if args and selection.looks_like_selector(args[0]):
             # Only a lone positive integer is a count. Multiple selectors
             # (including ranges) retain their explicit-position semantics.
-            additional_selectors = any(
-                selection.looks_like_selector(arg) for arg in args[1:]
-            )
+            additional_selectors = any(selection.looks_like_selector(arg) for arg in args[1:])
             command = "recent" if args[0].isdigit() and not additional_selectors else "pick"
             args = [command, *args]
         return super().resolve_command(ctx, args)
@@ -579,7 +577,9 @@ def recent_command(
     if merged_json and merged_markdown:
         raise typer.BadParameter("--json and --markdown cannot be combined")
     if inherited.preselect or inherited.preselect_records or inherited.last is not None:
-        raise typer.BadParameter("a positional count cannot be combined with preselection or --last")
+        raise typer.BadParameter(
+            "a positional count cannot be combined with preselection or --last"
+        )
     options = _merged_context_options(
         inherited,
         config_path=config_path,

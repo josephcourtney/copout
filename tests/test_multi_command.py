@@ -333,11 +333,14 @@ def test_positional_selector_captures_git_before_grpc(monkeypatch) -> None:
     assert '<git observed_at_capture="true" root="/repo"' in result.stdout
 
 
-@pytest.mark.parametrize("count, expected", [
-    (1, ["4"]),
-    (4, ["1", "2", "3", "4"]),
-    (9, ["1", "2", "3", "4"]),
-])
+@pytest.mark.parametrize(
+    "count, expected",
+    [
+        (1, ["4"]),
+        (4, ["1", "2", "3", "4"]),
+        (9, ["1", "2", "3", "4"]),
+    ],
+)
 def test_bare_integer_captures_count_not_offset(monkeypatch, count, expected) -> None:
     entries = [
         HistoryEntry(str(index), f"command-{index}", output=f"output-{index}")
@@ -368,13 +371,19 @@ def test_explicit_pick_retains_single_position_semantics(monkeypatch) -> None:
     result = runner.invoke(cli.app, ["pick", "4", "--print"])
 
     assert result.exit_code == 0, result.stderr
-    assert [run.attrib["history_id"] for run in ElementTree.fromstring(result.stdout).findall("run")] == ["1"]
+    assert [
+        run.attrib["history_id"] for run in ElementTree.fromstring(result.stdout).findall("run")
+    ] == ["1"]
 
 
 def test_count_respects_root_output_flags(monkeypatch) -> None:
-    monkeypatch.setattr(record, "recent_history", lambda count, *, failed_only=False: [
-        HistoryEntry(str(i), f"command-{i}", output=f"output-{i}") for i in range(count, 0, -1)
-    ])
+    monkeypatch.setattr(
+        record,
+        "recent_history",
+        lambda count, *, failed_only=False: [
+            HistoryEntry(str(i), f"command-{i}", output=f"output-{i}") for i in range(count, 0, -1)
+        ],
+    )
     monkeypatch.setattr(record, "hydrate_outputs", lambda selected: selected)
     for args in (["--json", "--print", "2"], ["2", "--json", "--print"]):
         result = runner.invoke(cli.app, args)
