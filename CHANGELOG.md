@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Add read-only analysis for the existing 2,400-line output probe plus five separate short-output, redraw, command-exit-tail, and rapid-consecutive-command probes; report missing output, history ordering, and source/presentation metadata without overstating completeness.
+
 ### Fixed
 
 - Match the inline Textual picker's `ansi-light` / `ansi-dark` theme to the active terminal background using a bounded OSC 11 query; fall back to dark on unsupported terminals. Preserve native ANSI palette colors and add PTY/headless tests plus opt-in real-Kitty screenshot qualification.

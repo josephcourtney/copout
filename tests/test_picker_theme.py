@@ -50,9 +50,10 @@ def test_theme_classification(rgb, theme) -> None:
 def test_pty_query_restores_terminal(response, expected) -> None:
     """Exercise a real POSIX PTY, including timeout and echo restoration."""
     master, slave = pty.openpty()
-    with os.fdopen(os.dup(slave), "rb", buffering=0) as input_stream, os.fdopen(
-        os.dup(slave), "wb", buffering=0
-    ) as output_stream:
+    with (
+        os.fdopen(os.dup(slave), "rb", buffering=0) as input_stream,
+        os.fdopen(os.dup(slave), "wb", buffering=0) as output_stream,
+    ):
         before = termios.tcgetattr(slave)
 
         def responder() -> None:
