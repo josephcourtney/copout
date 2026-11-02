@@ -71,7 +71,13 @@ def test_pty_query_restores_terminal(response, expected) -> None:
                 )
             )
             assert result == expected
-            assert termios.tcgetattr(slave) == before
+            after = termios.tcgetattr(slave)
+            # Darwin may set PENDIN (a transient kernel-managed retype bit)
+            # when tty modes are restored. All configurable bits must match.
+            transient = getattr(termios, "PENDIN", 0)
+            assert after[:3] == before[:3]
+            assert (after[3] & ~transient) == (before[3] & ~transient)
+            assert after[4:] == before[4:]
             thread.join(timeout=1)
             assert not thread.is_alive()
         finally:
