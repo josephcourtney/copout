@@ -46,15 +46,21 @@ def theme_for_background(rgb: tuple[float, float, float] | None) -> str:
     return "ansi-light" if luminance > 0.179 else "ansi-dark"
 
 
-def query_background(stream: BinaryIO, *, timeout: float = _TIMEOUT) -> tuple[float, float, float] | None:
+def query_background(
+    input_stream: BinaryIO,
+    output_stream: BinaryIO | None = None,
+    *,
+    timeout: float = _TIMEOUT,
+) -> tuple[float, float, float] | None:
     """Ask OSC 11 on a TTY with bounded input and restore its attributes.
 
     This must run before Textual starts reading input. No subprocess or Kitty
     remote-control connection is needed.
     """
     try:
-        fd = stream.fileno()
-        if not os.isatty(fd):
+        fd = input_stream.fileno()
+        output_fd = (output_stream if output_stream is not None else input_stream).fileno()
+        if not os.isatty(fd) or not os.isatty(output_fd):
             return None
         original = termios.tcgetattr(fd)
     except (OSError, ValueError, termios.error):
@@ -63,7 +69,7 @@ def query_background(stream: BinaryIO, *, timeout: float = _TIMEOUT) -> tuple[fl
     response = bytearray()
     try:
         tty.setcbreak(fd)
-        os.write(fd, _QUERY)
+        os.write(output_fd, _QUERY)
         deadline = time.monotonic() + max(0.0, timeout)
         while len(response) < _MAX_RESPONSE:
             remaining = deadline - time.monotonic()
@@ -87,6 +93,6 @@ def query_background(stream: BinaryIO, *, timeout: float = _TIMEOUT) -> tuple[fl
         termios.tcsetattr(fd, termios.TCSADRAIN, original)
 
 
-def detect_theme(stream: BinaryIO) -> str:
+def detect_theme(input_stream: BinaryIO, output_stream: BinaryIO | None = None) -> str:
     """Choose a terminal-native ANSI theme, defaulting safely to dark."""
-    return theme_for_background(query_background(stream))
+    return theme_for_background(query_background(input_stream, output_stream))
