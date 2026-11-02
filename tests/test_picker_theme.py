@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import pty
+import termios
 import threading
 
 import pytest
@@ -48,8 +49,6 @@ def test_theme_classification(rgb, theme) -> None:
 )
 def test_pty_query_restores_terminal(response, expected) -> None:
     """Exercise a real POSIX PTY, including timeout and echo restoration."""
-    import termios
-
     master, slave = pty.openpty()
     with os.fdopen(slave, "rb", buffering=0) as stream:
         before = termios.tcgetattr(slave)
