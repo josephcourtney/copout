@@ -56,7 +56,7 @@ def child(label: str, marker: Path) -> None:
                 encoding="utf-8",
             )
 
-    chosen = detect_theme(sys.stdin.buffer)
+    chosen = detect_theme(sys.stdin.buffer, sys.stdout.buffer)
     app = ProbePicker(
         [HistoryEntry("2", "recent example"), HistoryEntry("1", "older example")],
         preselected_ids=["1"],
