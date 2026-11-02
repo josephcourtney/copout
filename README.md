@@ -70,7 +70,7 @@ copout verify                  # concise history + output assertion
 
 Explicit picker selectors (including `copout pick 4`) are 1-based and newest-first after excluding Copout commands: `1` is the newest eligible command, `2` is the one before that, and so on. Selected runs are emitted chronologically. Explicit selectors are always noninteractive and automatically enlarge history discovery far enough to resolve the oldest requested position, so `copout pick 250` does not require `--limit 250`. A bare `copout 250` instead includes up to 250 recent eligible commands.
 
-`--limit` controls only the TUI browse window, which defaults to 100 entries. With no explicit selection query, Copout opens a bounded inline checklist. Use Up/Down or `j`/`k` to move one entry, Home/End or `g`/`G` to jump to the ends, Page Up/Page Down or `Ctrl-U`/`Ctrl-D` to move by a page, Space to toggle commands, Enter to copy or print the accumulated selection (or the most recent eligible command when nothing is selected), and Esc or `q` to cancel without touching the clipboard. The list scrolls within the inline region rather than printing the entire candidate window into shell history. Its inline region grows with the number of candidates up to 16 terminal rows, while the list and status line use at most 100 columns; a short history does not reserve a large empty frame. The picker uses Textual's native ANSI theme so its colors follow the terminal's configured palette, foreground, and background rather than Copout supplying a fixed dark theme.
+`--limit` controls only the TUI browse window, which defaults to 100 entries. With no explicit selection query, Copout opens a bounded inline checklist. Use Up/Down or `j`/`k` to move one entry, Home/End or `g`/`G` to jump to the ends, Page Up/Page Down or `Ctrl-U`/`Ctrl-D` to move by a page, Space to toggle commands, Enter to copy or print the accumulated selection (or the most recent eligible command when nothing is selected), and Esc or `q` to cancel without touching the clipboard. The list scrolls within the inline region rather than printing the entire candidate window into shell history. Its inline region grows with the number of candidates up to 16 terminal rows, while the list and status line use at most 100 columns; a short history does not reserve a large empty frame. The picker queries the active terminal's background via OSC 11 before Textual starts, choosing its built-in `ansi-light` or `ansi-dark` theme using relative luminance. Native ANSI colors use the terminal's own palette, foreground, and background. An unsupported or timed-out query defaults to `ansi-dark` (a bounded 150 ms probe). The probe does not modify the palette or OS appearance.
 
 `--preselect` uses the same relative selector grammar as noninteractive positional selection, but opens the TUI instead of finalizing the selection. It is repeatable and also accepts comma-separated values. `--preselect-records` addresses exact Atuin record IDs and is intended for integrations that need stable identity rather than a relative history offset. The two preselection forms may be combined and their selections are unioned. Preselection cannot be combined with positional selectors, `-n`, or `--failure`, because those already define a completed noninteractive query.
 
@@ -79,6 +79,16 @@ Formatting, output-delivery, and context options are orthogonal to selection. Op
 Picker discovery reads only Atuin history metadata. Copout asks the daemon for output only after the selection is known, and then only for the selected commands. The Textual UI is imported only when an interactive picker is actually opened. Picker drawing is routed to the controlling terminal rather than structured stdout, so redirected semantic output remains clean after confirmation. A bare or preselected interactive invocation without a controlling terminal fails explicitly rather than silently changing selection behavior; scripts should use positional selectors, `-n`, or `--failure`.
 
 Copout retrieves persisted chronological history with `atuin history list --session` and retrieves recent captured output from the Atuin daemon through Jerakeen. It does not access Atuin's private database or implement the daemon gRPC protocol itself.
+
+### Theme qualification
+
+The normal test suite includes OSC 11 parsing, luminance classification, synthetic PTY exchange, terminal-state restoration, and headless light/dark picker navigation. For an optional real-Kitty test, from a Kitty session with remote control enabled, run:
+
+```console
+uv run python scripts/qualify_picker_themes.py --out /tmp/copout-picker-themes
+```
+
+This launches two temporary **OS windows** with per-window light and dark colors, checks the actual theme selected by the picker, saves both Kitty screenshots and a JSON summary, and closes only its temporary windows. It neither changes configured colors nor touches existing windows. Inspect the screenshots for highlight, checkbox, and border contrast. This is a separate, opt-in GUI qualification, not part of `just check`.
 
 ## Presentation behavior
 
