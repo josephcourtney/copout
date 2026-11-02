@@ -168,3 +168,18 @@ def test_picker_ansi_theme_keeps_selection_usable() -> None:
         assert app.return_value == [1]
 
     asyncio.run(exercise())
+
+
+def test_picker_light_theme_preserves_navigation() -> None:
+    async def exercise() -> None:
+        app = picker.CommandPicker(
+            [HistoryEntry("2", "recent"), HistoryEntry("1", "older")],
+            theme_name="ansi-light",
+        )
+        async with app.run_test(size=(80, 12)) as pilot:
+            assert app.current_theme.name == "ansi-light"
+            assert app.native_ansi_color
+            await pilot.press("down", "space", "enter")
+        assert app.return_value == [1]
+
+    asyncio.run(exercise())
