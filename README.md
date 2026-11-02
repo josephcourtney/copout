@@ -35,11 +35,12 @@ copout verify
 
 ## Use
 
-Copout has two primary selection modes: no explicit selection opens the interactive picker, while positional selectors gather exactly the requested history entries without opening the TUI.
+Copout has three selection modes: no explicit selection opens the interactive picker; a lone positive integer captures that many most recent eligible commands; multiple positional selectors or ranges gather specified history positions without opening the TUI.
 
 ```console
 copout                         # open the interactive picker
 copout 1                       # latest non-Copout command, noninteractive
+copout 4                       # latest four non-Copout commands, oldest first
 copout 1 3 6                   # gather non-contiguous recent commands
 copout 2-4 8                   # inclusive ranges
 copout 1,4,7                   # comma-separated selectors also work
@@ -67,13 +68,13 @@ copout doctor                  # detailed integration diagnostics
 copout verify                  # concise history + output assertion
 ```
 
-Selectors are 1-based and newest-first after excluding Copout commands: `1` is the newest eligible command, `2` is the one before that, and so on. Selected runs are emitted chronologically. Explicit selectors are always noninteractive and automatically enlarge history discovery far enough to resolve the oldest requested position, so `copout 250` does not require `--limit 250`.
+Explicit picker selectors (including `copout pick 4`) are 1-based and newest-first after excluding Copout commands: `1` is the newest eligible command, `2` is the one before that, and so on. Selected runs are emitted chronologically. Explicit selectors are always noninteractive and automatically enlarge history discovery far enough to resolve the oldest requested position, so `copout pick 250` does not require `--limit 250`. A bare `copout 250` instead includes up to 250 recent eligible commands.
 
 `--limit` controls only the TUI browse window, which defaults to 100 entries. With no explicit selection query, Copout opens a bounded inline checklist. Use Up/Down or `j`/`k` to move one entry, Home/End or `g`/`G` to jump to the ends, Page Up/Page Down or `Ctrl-U`/`Ctrl-D` to move by a page, Space to toggle commands, Enter to copy or print the accumulated selection (or the most recent eligible command when nothing is selected), and Esc or `q` to cancel without touching the clipboard. The list scrolls within the inline region rather than printing the entire candidate window into shell history. Its inline region grows with the number of candidates up to 16 terminal rows, while the list and status line use at most 100 columns; a short history does not reserve a large empty frame.
 
 `--preselect` uses the same relative selector grammar as noninteractive positional selection, but opens the TUI instead of finalizing the selection. It is repeatable and also accepts comma-separated values. `--preselect-records` addresses exact Atuin record IDs and is intended for integrations that need stable identity rather than a relative history offset. The two preselection forms may be combined and their selections are unioned. Preselection cannot be combined with positional selectors, `-n`, or `--failure`, because those already define a completed noninteractive query.
 
-Formatting, output-delivery, and context options are orthogonal to selection. Options may appear before a root positional selector or after it; for example, `copout --markdown 1 3` and `copout 1 3 --markdown` have the same meaning.
+Formatting, output-delivery, and context options are orthogonal to selection. Options may appear before a root positional selection or after it; for example, `copout --markdown 1 3` and `copout 1 3 --markdown` have the same meaning.
 
 Picker discovery reads only Atuin history metadata. Copout asks the daemon for output only after the selection is known, and then only for the selected commands. The Textual UI is imported only when an interactive picker is actually opened. Picker drawing is routed to the controlling terminal rather than structured stdout, so redirected semantic output remains clean after confirmation. A bare or preselected interactive invocation without a controlling terminal fails explicitly rather than silently changing selection behavior; scripts should use positional selectors, `-n`, or `--failure`.
 
