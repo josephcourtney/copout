@@ -85,7 +85,7 @@ Copout retrieves persisted chronological history with `atuin history list --sess
 The normal test suite includes OSC 11 parsing, luminance classification, synthetic PTY exchange, terminal-state restoration, and headless light/dark picker navigation. For an optional real-Kitty test, from a Kitty session with remote control enabled, run:
 
 ```console
-uv run python scripts/qualify_picker_themes.py --out /tmp/copout-picker-themes
+just kitty-theme-check
 ```
 
 This launches two temporary **OS windows** with per-window light and dark colors, checks the actual theme selected by the picker, saves both Kitty screenshots and a JSON summary, and closes only its temporary windows. It neither changes configured colors nor touches existing windows. Inspect the screenshots for highlight, checkbox, and border contrast. This is a separate, opt-in GUI qualification, not part of `just check`.
