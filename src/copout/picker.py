@@ -175,7 +175,7 @@ def pick_entries(
             # controlling terminal so `copout pick -p > context.xml` stays clean.
             sys.stdin = input_stream
             sys.stdout = output_stream
-            theme_name = detect_theme(input_stream.buffer)
+            theme_name = detect_theme(input_stream.buffer, output_stream.buffer)
             indexes = CommandPicker(
                 entries, preselected_ids=preselected_ids, theme_name=theme_name
             ).run(
