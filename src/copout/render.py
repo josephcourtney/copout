@@ -484,18 +484,18 @@ def _render_markdown(record: CopoutRecord) -> str:
     return "\n".join(lines) + "\n"
 
 
-def render(
+def render_with_projection(
     record: CopoutRecord,
     *,
     as_json: bool = False,
     as_markdown: bool = False,
     pretty_attributes: bool = False,
-) -> str:
+) -> tuple[str, CopoutRecord]:
     projected = _semantic_record(record)
     if as_markdown:
-        return _render_markdown(projected)
+        return _render_markdown(projected), projected
     if as_json:
-        return json.dumps(projected, indent=2, ensure_ascii=False) + "\n"
+        return json.dumps(projected, indent=2, ensure_ascii=False) + "\n", projected
 
     attrs = [
         _attribute("version", projected["version"]),
@@ -520,4 +520,21 @@ def render(
             )
         )
     lines.append("</copout>")
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines) + "\n", projected
+
+
+def render(
+    record: CopoutRecord,
+    *,
+    as_json: bool = False,
+    as_markdown: bool = False,
+    pretty_attributes: bool = False,
+) -> str:
+    """Render without changing the established public return type."""
+    document, _ = render_with_projection(
+        record,
+        as_json=as_json,
+        as_markdown=as_markdown,
+        pretty_attributes=pretty_attributes,
+    )
+    return document
