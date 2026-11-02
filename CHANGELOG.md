@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Documentation
+
+- Update Atuin compatibility guidance for the validated 18.24/protocol-5 fork, record passing 2026-11-02 output qualifications, and formalize event-time versus capture-time Git provenance. No runtime or schema change.
+
 ### Added
 
 - Add read-only analysis for the existing 2,400-line output probe plus five separate short-output, redraw, command-exit-tail, and rapid-consecutive-command probes; report missing output, history ordering, and source/presentation metadata without overstating completeness.

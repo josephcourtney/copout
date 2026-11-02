@@ -7,7 +7,7 @@ Copout does **not** run a terminal watcher, maintain its own command journal, or
 ## Requirements
 
 - Python 3.13+
-- Atuin 18.23.x on `PATH`
+- Compatible Atuin with daemon and `pty-proxy` output capture (validated with the maintained 18.24/protocol-5 fork; check with `copout doctor`)
 - Atuin shell integration
 - For command output: Atuin daemon + `pty-proxy` + output capture enabled
 - macOS `pbcopy`, Wayland `wl-copy`, or X11 `xclip`/`xsel`
@@ -22,7 +22,7 @@ Use Atuin's own output-capture setup command:
 atuin config enable output-capture
 ```
 
-On Atuin 18.23 this enables the daemon when necessary, enables `pty_proxy.enabled` and `output.enabled`, and restarts an autostart-managed daemon so the capture backend picks up the new configuration. Follow any restart instructions printed by Atuin, then open a new shell.
+On supported Atuin versions, this enables the required output-capture components. Follow restart instructions printed by Atuin, then open a new shell.
 
 Run a command and verify the complete path:
 
@@ -145,7 +145,7 @@ Disabled by default:
 - Arbitrary environment variables.
 - Explicit executable resolution.
 
-Git context is marked `observed_at_capture="true"`: it describes repository state when Copout creates the record, not necessarily repository state at the historical command's original timestamp. Historical `cwd`, command time, status, and duration continue to come from Atuin.
+Git context is marked `observed_at_capture="true"`: it describes repository state when Copout creates the record, **not** necessarily repository state at the historical command's original timestamp. Historical `cwd`, command time, status, and duration come from Atuin. When multiple commands share a working directory, the same capture-time Git snapshot may appear on each run; this does **not** imply that they ran on that branch or commit. Copout does not reconstruct historical branches from current refs, reflogs, or command text. See [the Git provenance contract](docs/GIT_PROVENANCE.md).
 
 All extra context can be disabled with `--no-context`. Category overrides include `--no-git-context`, `--no-system-context`, `--no-python-context`, `--hostname-context`, `--shell-version`, `--os-version`, `--git-extended`, and `--git-diff`. `--env NAME` and `--resolve NAME` are repeatable and only expose values explicitly requested.
 
