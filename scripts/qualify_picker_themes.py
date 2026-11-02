@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -45,6 +46,20 @@ def remote(*args: str) -> str:
         timeout=10,
     )
     return result.stdout.strip()
+
+
+def parse_kitty_colors(report: str) -> dict[str, str]:
+    """Parse kitty.conf-style key/value lines independent of whitespace."""
+    colors: dict[str, str] = {}
+    for line in report.splitlines():
+        fields = line.split("#", 1)[0].split()
+        if len(fields) >= 2:
+            colors[fields[0]] = fields[1].lower()
+        else:
+            match = re.match(r"^\\s*(\\w+)\\s+(#[0-9a-fA-F]{6})\\s*$", line)
+            if match:
+                colors[match.group(1)] = match.group(2).lower()
+    return colors
 
 
 def child(label: str, marker: Path) -> None:
@@ -91,13 +106,17 @@ def qualify(out: Path) -> None:
                 raise AssertionError(f"{label}: expected {expected}, got {state['theme']}")
             colors = remote("get-colors", "--match", f"id:{window_id}")
             (out / f"{label}-colors.txt").write_text(colors + "\n", encoding="utf-8")
-            if f"background {background.lower()}" not in colors.lower():
-                raise AssertionError(f"{label}: Kitty background does not match requested palette")
+            actual = parse_kitty_colors(colors)
             time.sleep(0.4)  # allow the first full render to reach Kitty
             shot = out / f"{label}.png"
             remote("screenshot", "--match", f"id:{window_id}", str(shot))
             if not shot.is_file() or shot.stat().st_size == 0:
                 raise AssertionError(f"{label}: no PNG screenshot saved")
+            if actual.get("background") != background.lower():
+                raise AssertionError(
+                    f"{label}: expected background {background}, got {actual.get('background')!r}. "
+                    f"Full report saved in {out / (label + '-colors.txt')}"
+                )
             results.append({"palette": label, "theme": state["theme"], "screenshot": str(shot)})
         finally:
             remote("close-window", "--match", f"id:{window_id}")
