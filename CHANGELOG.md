@@ -4,7 +4,7 @@
 
 ### Added
 
-- Add read-only analysis for the existing 2,400-line output probe, checking exact payloads, missing lines, boundary markers and upstream/presentation metadata without overstating completeness.
+- Add read-only analysis for the existing 2,400-line output probe plus five separate short-output, redraw, command-exit-tail, and rapid-consecutive-command probes; report missing output, history ordering, and source/presentation metadata without overstating completeness.
 
 ### Fixed
 
