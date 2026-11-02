@@ -19,7 +19,9 @@ class SelectorGroup(TyperGroup):
         if args and selection.looks_like_selector(args[0]):
             # Only a lone positive integer is a count. Multiple selectors
             # (including ranges) retain their explicit-position semantics.
-            additional_selectors = any(selection.looks_like_selector(arg) for arg in args[1:])
+            additional_selectors = any(
+                selection.looks_like_selector(arg) for arg in args[1:]
+            )
             command = "recent" if args[0].isdigit() and not additional_selectors else "pick"
             args = [command, *args]
         return super().resolve_command(ctx, args)
