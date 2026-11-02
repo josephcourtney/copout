@@ -69,11 +69,11 @@ class CommandPicker(App[list[int] | None]):
         # Textual reads CSS variables during App initialization.
         self._entries = list(entries)
         self._preselected_ids = set(preselected_ids)
-        # Use the terminal's own ANSI palette and default foreground/background.
+        # Use Textual's registered ANSI theme and the terminal palette.
         # In particular, avoid imposing Textual's dark RGB palette on a light
         # terminal or replacing the terminal's configured accent colors.
         super().__init__(ansi_color=True)
-        self.theme = "textual-ansi"
+        self.theme = "ansi-dark"
 
     def get_css_variables(self) -> dict[str, str]:
         """Size the inline region before its first frame, without a resize redraw."""
