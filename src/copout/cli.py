@@ -8,7 +8,7 @@ from typing import Annotated
 import typer
 from typer.core import TyperGroup
 
-from . import atuin, clipboard, doctor, record, render, selection
+from . import atuin, capture_diagnostics, clipboard, doctor, record, render, selection
 from .config import ConfigError, ContextOptions, load_context_options
 
 
@@ -46,6 +46,9 @@ class _RootOptions:
     as_json: bool = False
     as_markdown: bool = False
     pretty_attributes: bool = False
+    diagnostics: bool = False
+    diagnostics_verbose: bool = False
+    check: bool = False
     last: int | None = None
     failure: bool = False
     limit: int | None = None
@@ -82,14 +85,45 @@ def _write_record(
     as_json: bool,
     as_markdown: bool,
     pretty_attributes: bool,
+    diagnostics: bool = False,
+    diagnostics_verbose: bool = False,
+    check: bool = False,
+    requested: int | None = None,
+    expected_ids: list[str] | None = None,
+    print_output: bool = False,
 ) -> int:
-    rendered = render.render(
-        captured,
-        as_json=as_json,
-        as_markdown=as_markdown,
-        pretty_attributes=pretty_attributes,
-    )
+    if diagnostics or diagnostics_verbose or check:
+        rendered, projected = render.render_with_projection(
+            captured,
+            as_json=as_json,
+            as_markdown=as_markdown,
+            pretty_attributes=pretty_attributes,
+        )
+        report = capture_diagnostics.inspect(
+            captured, projected, rendered, requested=requested, expected_ids=expected_ids
+        )
+        sys.stderr.write(capture_diagnostics.format_report(report, verbose=diagnostics_verbose))
+        if check and report.check_failed:
+            # Never replace clipboard contents or print an incomplete document.
+            return 4
+    else:
+        rendered = render.render(
+            captured,
+            as_json=as_json,
+            as_markdown=as_markdown,
+            pretty_attributes=pretty_attributes,
+        )
     if writer is None:
+        if check and not print_output:
+            # Defer clipboard startup until after strict validation succeeds.
+            delayed, error_code = _start_writer(print_output=False)
+            if error_code is not None:
+                return error_code
+            assert delayed is not None
+            try:
+                return delayed.write(rendered)
+            finally:
+                delayed.abort()
         sys.stdout.write(rendered)
         return 0
     return writer.write(rendered)
@@ -157,8 +191,11 @@ def run(
     count: int,
     failure: bool,
     context_options: ContextOptions | None = None,
+    diagnostics: bool = False,
+    diagnostics_verbose: bool = False,
+    check: bool = False,
 ) -> int:
-    writer, error_code = _start_writer(print_output=print_output)
+    writer, error_code = (None, None) if check else _start_writer(print_output=print_output)
     if error_code is not None:
         return error_code
 
@@ -181,6 +218,11 @@ def run(
             as_json=as_json,
             as_markdown=as_markdown,
             pretty_attributes=pretty_attributes,
+            diagnostics=diagnostics,
+            diagnostics_verbose=diagnostics_verbose,
+            check=check,
+            requested=count,
+            print_output=print_output,
         )
     finally:
         if writer is not None:
@@ -208,6 +250,9 @@ def run_pick(
     as_markdown: bool,
     pretty_attributes: bool,
     context_options: ContextOptions | None = None,
+    diagnostics: bool = False,
+    diagnostics_verbose: bool = False,
+    check: bool = False,
 ) -> int:
     try:
         record_ids = selection.parse_record_ids(preselect_records) if preselect_records else []
@@ -245,7 +290,7 @@ def run_pick(
     except record.AtuinError as exc:
         return _report_atuin_error(exc)
 
-    writer, error_code = _start_writer(print_output=print_output)
+    writer, error_code = (None, None) if check else _start_writer(print_output=print_output)
     if error_code is not None:
         return error_code
 
@@ -259,6 +304,12 @@ def run_pick(
             as_json=as_json,
             as_markdown=as_markdown,
             pretty_attributes=pretty_attributes,
+            diagnostics=diagnostics,
+            diagnostics_verbose=diagnostics_verbose,
+            check=check,
+            requested=len(selected),
+            expected_ids=[entry.id for entry in selected],
+            print_output=print_output,
         )
     finally:
         if writer is not None:
@@ -316,6 +367,19 @@ def cli(
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON instead of XML.")] = False,
     as_markdown: Annotated[
         bool, typer.Option("--markdown", help="Emit readable Markdown instead of XML.")
+    ] = False,
+    diagnostics: Annotated[
+        bool,
+        typer.Option(
+            "--diagnostics", help="Print capture inventory and integrity findings to stderr."
+        ),
+    ] = False,
+    diagnostics_verbose: Annotated[
+        bool,
+        typer.Option("--diagnostics-verbose", help="Print per-command capture sizes and findings."),
+    ] = False,
+    check: Annotated[
+        bool, typer.Option("--check", help="Reject missing or incomplete captures (exit 4).")
     ] = False,
     pretty_attributes: Annotated[
         bool,
@@ -425,6 +489,9 @@ def cli(
         as_json=as_json,
         as_markdown=as_markdown,
         pretty_attributes=pretty_attributes,
+        diagnostics=diagnostics,
+        diagnostics_verbose=diagnostics_verbose,
+        check=check,
         last=last,
         failure=failure,
         limit=limit,
@@ -476,6 +543,9 @@ def cli(
                 count=last or 1,
                 failure=failure,
                 context_options=options,
+                diagnostics=diagnostics,
+                diagnostics_verbose=diagnostics_verbose,
+                check=check,
             )
         )
 
@@ -490,6 +560,9 @@ def cli(
             as_markdown=as_markdown,
             pretty_attributes=pretty_attributes,
             context_options=options,
+            diagnostics=diagnostics,
+            diagnostics_verbose=diagnostics_verbose,
+            check=check,
         )
     )
 
@@ -507,6 +580,15 @@ def recent_command(
     ] = False,
     pretty_attributes: Annotated[
         bool, typer.Option("--pretty-attributes", help="Format XML attributes on separate lines.")
+    ] = False,
+    diagnostics: Annotated[
+        bool, typer.Option("--diagnostics", help="Print capture integrity findings to stderr.")
+    ] = False,
+    diagnostics_verbose: Annotated[
+        bool, typer.Option("--diagnostics-verbose", help="Print per-command capture diagnostics.")
+    ] = False,
+    check: Annotated[
+        bool, typer.Option("--check", help="Reject missing or incomplete captures (exit 4).")
     ] = False,
     config_path: Annotated[
         Path | None,
@@ -604,6 +686,9 @@ def recent_command(
             count=count,
             failure=inherited.failure,
             context_options=options,
+            diagnostics=diagnostics or inherited.diagnostics,
+            diagnostics_verbose=diagnostics_verbose or inherited.diagnostics_verbose,
+            check=check or inherited.check,
         )
     )
 
@@ -646,6 +731,19 @@ def pick_command(
     as_json: Annotated[bool, typer.Option("--json", help="Emit JSON instead of XML.")] = False,
     as_markdown: Annotated[
         bool, typer.Option("--markdown", help="Emit readable Markdown instead of XML.")
+    ] = False,
+    diagnostics: Annotated[
+        bool,
+        typer.Option(
+            "--diagnostics", help="Print capture inventory and integrity findings to stderr."
+        ),
+    ] = False,
+    diagnostics_verbose: Annotated[
+        bool,
+        typer.Option("--diagnostics-verbose", help="Print per-command capture sizes and findings."),
+    ] = False,
+    check: Annotated[
+        bool, typer.Option("--check", help="Reject missing or incomplete captures (exit 4).")
     ] = False,
     pretty_attributes: Annotated[
         bool,
@@ -755,6 +853,9 @@ def pick_command(
             as_markdown=merged_markdown,
             pretty_attributes=pretty_attributes or inherited.pretty_attributes,
             context_options=options,
+            diagnostics=diagnostics or inherited.diagnostics,
+            diagnostics_verbose=diagnostics_verbose or inherited.diagnostics_verbose,
+            check=check or inherited.check,
         )
     )
 

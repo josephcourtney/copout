@@ -8,6 +8,8 @@
 
 ### Added
 
+- Add opt-in `--diagnostics`, `--diagnostics-verbose`, and strict `--check` capture-integrity modes for count, positional selection, and the TUI. Reports are content-free on stderr; strict rejection precedes clipboard delivery, with exit status 4 for known incompleteness or inconsistency.
+
 - Add read-only analysis for the existing 2,400-line output probe plus five separate short-output, redraw, command-exit-tail, and rapid-consecutive-command probes; report missing output, history ordering, and source/presentation metadata without overstating completeness.
 
 ### Fixed

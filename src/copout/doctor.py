@@ -169,7 +169,10 @@ def doctor() -> int:
         print(f"  jerakeen daemon:   {'yes' if result.daemon.healthy else 'UNHEALTHY'}")
         print(f"    target:           {result.daemon.description}")
         print(f"    atuin:            {result.daemon.version}")
-        print(f"    protocol:         {result.daemon.protocol}")
+        print(
+            f"    protocol:         "
+            f"{result.daemon.protocol if result.daemon.protocol is not None else 'not exposed (build-gated)'}"
+        )
         print(f"    pid:              {result.daemon.pid}")
 
     if result.latest is not None:
