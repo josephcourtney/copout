@@ -25,7 +25,12 @@ def parse_background_response(response: bytes) -> tuple[float, float, float] | N
     match = _RESPONSE.search(response)
     if match is None:
         return None
-    return tuple(int(part, 16) / (16 ** len(part) - 1) for part in match.groups())  # type: ignore[return-value]
+    parts = match.groups()
+    return (
+        int(parts[0], 16) / (16 ** len(parts[0]) - 1),
+        int(parts[1], 16) / (16 ** len(parts[1]) - 1),
+        int(parts[2], 16) / (16 ** len(parts[2]) - 1),
+    )
 
 
 def theme_for_background(rgb: tuple[float, float, float] | None) -> str:
