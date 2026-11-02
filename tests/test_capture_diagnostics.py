@@ -185,12 +185,17 @@ def test_pick_and_root_diagnostics_flags_are_inherited(monkeypatch) -> None:
         return 0
 
     monkeypatch.setattr(cli, "run_pick", capture)
+    monkeypatch.setattr(cli, "run", capture)
     for args in (
         ["--check", "--diagnostics-verbose", "1"],
+        ["1", "--check", "--diagnostics-verbose"],
         ["pick", "1", "--check", "--diagnostics-verbose"],
     ):
         result = runner.invoke(cli.app, args)
         assert result.exit_code == 0, result.stderr
+    assert len(observed) == 3
+    assert observed[0]["count"] == observed[1]["count"] == 1
+    assert observed[2]["selectors"] == ["1"]
     assert all(item["check"] and item["diagnostics_verbose"] for item in observed)
 
 
@@ -200,7 +205,7 @@ def test_hydration_identity_mismatch_rejects_selected_capture(monkeypatch) -> No
     hydrated = [replace(selected[0], id="changed")]
     monkeypatch.setattr(cli.atuin, "recent_history", lambda limit, *, required_ids=(): selected)
     monkeypatch.setattr(cli.atuin, "hydrate_outputs", lambda entries: hydrated)
-    result = runner.invoke(cli.app, ["1", "--check", "--print"])
+    result = runner.invoke(cli.app, ["pick", "1", "--check", "--print"])
     assert result.exit_code == 4
     assert result.stdout == ""
     assert "selected-history-id-mismatch" in result.stderr
