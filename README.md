@@ -108,6 +108,22 @@ just analyze-output-probe /tmp/copout-output-probe.json
 
 The analyzer verifies all 2,400 numbered lines (including their payloads), both boundary markers, stderr, ANSI-stripped text, and the carriage-return redraw result. It prints machine-readable counts and capture metadata, returning exit code 0 for an intact probe, 1 for missing/altered output, and 2 for invalid input. A successful probe does **not** certify general command-output completeness. If data is missing, compare the Atuin raw PTY capture, rendered snapshot, daemon response, and Copout's presented text before deciding which layer requires repair; the analysis itself cannot attribute the loss to a specific layer.
 
+### Short-output, redraw, rapid-command, and exit-tail qualification
+
+Run the following as **individual shell commands** in the same Kitty/Atuin session. In particular, do not use a loop or run all five probes inside a single script: the test depends on their being five separate Atuin history records. Run the two rapid cases consecutively.
+
+```console
+bash scripts/probe_output_edges.sh short
+bash scripts/probe_output_edges.sh redraw
+bash scripts/probe_output_edges.sh tail
+bash scripts/probe_output_edges.sh rapid-a
+bash scripts/probe_output_edges.sh rapid-b
+copout 5 --json -p > /tmp/copout-output-edges.json
+just analyze-output-edges /tmp/copout-output-edges.json
+```
+
+The analysis compares exact known output for the five distinct records, confirms the rapid cases' chronological order, and reports per-record Atuin and Copout completeness metadata. The expected redraw is the final line `ready`, not the intermediate progress text. A nonzero exit indicates a missing history record, altered/missing output, or a reported incomplete capture. As with the large-output probe, a passing result is evidence for these cases only; it is not a guarantee that all commands can be captured losslessly.
+
 ## Execution context
 
 Schema version 9 retains compact environment and repository context. The defaults are intended to provide useful development context without automatically exposing hostnames, remotes, arbitrary environment variables, or large diffs.
