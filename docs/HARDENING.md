@@ -53,3 +53,16 @@ The run occurred with a locally modified working tree because `just fix` reforma
 Atuin supplies each run's historical timestamp, status, cwd, and duration. Copout's Git and environment enrichment inspects the **current** filesystem and process only when invoked. The Git record therefore carries `observed_at_capture=true`, while the output envelope distinguishes `captured_at` from Atuin's `recorded_at`.
 
 Regression tests build records with old Atuin timestamps and a known current Git commit, verifying that XML/JSON retain both provenance classes rather than presenting current Git state as historical. Additional historical fields should be introduced only when a trusted upstream supplies an authoritative observation; no reconstructed guesses or shell/git hook mutations are added.
+
+## Output-fidelity qualification (November 2, 2026)
+
+Live known-output probes passed in the maintained Atuin protocol-5 environment:
+
+- 2,400-line probe: every numbered payload, both boundary markers, stderr, and final redraw preserved; `truncated=false` and `completeness=unknown`.
+- Five independent commands: short output, terminal redraw, exit-tail, and two rapid consecutive commands all preserved in order; none reported upstream truncation.
+
+These cases are not proof of lossless capture for arbitrary commands. An earlier stray character in a `git status` snapshot was not reproduced. No change to Atuin's capture mechanism is justified by this evidence. The Copout analyzers remain read-only.
+
+## Event-time Git provenance
+
+See [GIT_PROVENANCE.md](GIT_PROVENANCE.md). The current Atuin history interface supplies historical cwd, timestamps, exit status and duration, but no execution-time Git state. Consequently the Git context recorded by Copout is explicitly capture-time; it must not be inferred from reflogs, command strings or current refs.
