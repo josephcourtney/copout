@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Use the terminal's native ANSI palette for the inline Textual picker, including light/dark terminal backgrounds and configured accents, without terminal-specific palette queries.
+
 - Interpret a lone positional integer (`copout 4`) as a count of recent commands, preserving explicit positional selection through `copout pick 4`.
 
 - Snapshot Git and environment context before opening the Atuin gRPC client, avoiding macOS gRPC fork-handler diagnostics during normal command capture while preserving Git metadata.
