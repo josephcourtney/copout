@@ -50,7 +50,9 @@ def test_theme_classification(rgb, theme) -> None:
 def test_pty_query_restores_terminal(response, expected) -> None:
     """Exercise a real POSIX PTY, including timeout and echo restoration."""
     master, slave = pty.openpty()
-    with os.fdopen(slave, "rb", buffering=0) as stream:
+    with os.fdopen(os.dup(slave), "rb", buffering=0) as input_stream, os.fdopen(
+        os.dup(slave), "wb", buffering=0
+    ) as output_stream:
         before = termios.tcgetattr(slave)
 
         def responder() -> None:
@@ -64,7 +66,9 @@ def test_pty_query_restores_terminal(response, expected) -> None:
         thread.start()
         try:
             result = picker_theme.theme_for_background(
-                picker_theme.query_background(stream, timeout=0.04 if response is None else 0.3)
+                picker_theme.query_background(
+                    input_stream, output_stream, timeout=0.04 if response is None else 0.3
+                )
             )
             assert result == expected
             assert termios.tcgetattr(slave) == before
@@ -72,6 +76,7 @@ def test_pty_query_restores_terminal(response, expected) -> None:
             assert not thread.is_alive()
         finally:
             os.close(master)
+            os.close(slave)
 
 
 def test_non_tty_does_not_send_probe() -> None:
