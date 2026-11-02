@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- Use the terminal's native ANSI palette for the inline Textual picker, including light/dark terminal backgrounds and configured accents, without terminal-specific palette queries.
+- Match the inline Textual picker's `ansi-light` / `ansi-dark` theme to the active terminal background using a bounded OSC 11 query; fall back to dark on unsupported terminals. Preserve native ANSI palette colors and add PTY/headless tests plus opt-in real-Kitty screenshot qualification.
 
 - Interpret a lone positional integer (`copout 4`) as a count of recent commands, preserving explicit positional selection through `copout pick 4`.
 
