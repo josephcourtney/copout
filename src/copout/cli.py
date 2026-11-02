@@ -16,10 +16,12 @@ class SelectorGroup(TyperGroup):
     """Route selector-shaped command tokens to the picker command."""
 
     def resolve_command(self, ctx, args):
-        if args and args[0].isdigit() and len(args[0]) > 0:
-            args = ["recent", *args]
-        elif args and selection.looks_like_selector(args[0]):
-            args = ["pick", *args]
+        if args and selection.looks_like_selector(args[0]):
+            # Only a lone positive integer is a count. Multiple selectors
+            # (including ranges) retain their explicit-position semantics.
+            additional_selectors = any(selection.looks_like_selector(arg) for arg in args[1:])
+            command = "recent" if args[0].isdigit() and not additional_selectors else "pick"
+            args = [command, *args]
         return super().resolve_command(ctx, args)
 
 
