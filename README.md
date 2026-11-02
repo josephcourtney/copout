@@ -96,6 +96,18 @@ Copout presents Atuin's retained terminal snapshot as safe plain text across XML
 
 Presented output is bounded to 256 KiB per run and 1 MiB across all runs, including captures containing only one run. Oversized output preserves both its beginning and end with an explicit omission marker. JSON adds `presentation_truncated` and `presentation_omitted_bytes` when Copout shortens an output, while XML adds the same attributes to `<output>`. This presentation truncation is separate from any truncation reported by Atuin. Because schema v9 uses one universal envelope, the presentation rules no longer depend on whether a command was selected with `-n 1`, a positional selector, or the TUI.
 
+### Output-fidelity qualification
+
+Copout receives a rendered snapshot from Atuin, not a lossless PTY transcript. For a reproducible check of **known output**, run each of the following as a separate command in the same Kitty/Atuin-enabled shell (do not paste them as a multiline command):
+
+```console
+bash scripts/probe_output.sh
+copout 1 --json -p > /tmp/copout-output-probe.json
+just analyze-output-probe /tmp/copout-output-probe.json
+```
+
+The analyzer verifies all 2,400 numbered lines (including their payloads), both boundary markers, stderr, ANSI-stripped text, and the carriage-return redraw result. It prints machine-readable counts and capture metadata, returning exit code 0 for an intact probe, 1 for missing/altered output, and 2 for invalid input. A successful probe does **not** certify general command-output completeness. If data is missing, compare the Atuin raw PTY capture, rendered snapshot, daemon response, and Copout's presented text before deciding which layer requires repair; the analysis itself cannot attribute the loss to a specific layer.
+
 ## Execution context
 
 Schema version 9 retains compact environment and repository context. The defaults are intended to provide useful development context without automatically exposing hostnames, remotes, arbitrary environment variables, or large diffs.
