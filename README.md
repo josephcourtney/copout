@@ -90,6 +90,20 @@ just kitty-theme-check
 
 This launches two temporary **OS windows** with per-window light and dark colors, checks the actual theme selected by the picker, saves both Kitty screenshots and a JSON summary, and closes only its temporary windows. It neither changes configured colors nor touches existing windows. Inspect the screenshots for highlight, checkbox, and border contrast. This is a separate, opt-in GUI qualification, not part of `just check`.
 
+## Capture-integrity diagnostics
+
+Optional read-only diagnostics inspect the already assembled capture and the exact normalized, budgeted presentation. They do not change Atuin settings, save output, launch a watcher, or add daemon traffic. Reports go to **stderr**, keeping XML/JSON/Markdown and clipboard content unchanged.
+
+```console
+copout 4 --diagnostics -p         # Four newest eligible commands: count mode
+copout pick 4 --diagnostics -p    # Fourth newest eligible command: position mode
+copout -n 3 --diagnostics-verbose -p
+copout 1 --check -p               # Exit 4 on known invalid/incomplete capture
+copout pick 1 --check            # Do not touch clipboard until validation passes
+```
+
+`--diagnostics` reports aggregate inventory and detected faults; `--diagnostics-verbose` adds per-run measurements. `--check` rejects known missing, truncated, inconsistent, or selection-shortfall captures **before delivery**, returning exit status 4. Its successful result means **no detected loss**, not a guarantee of complete terminal scrollback: Atuin's ordinary snapshot completeness remains `unknown`. Large differences between upstream PTY traffic and retained snapshot size remain advisory rather than conclusive. See [capture diagnostics](docs/CAPTURE_DIAGNOSTICS.md).
+
 ## Presentation behavior
 
 Copout presents Atuin's retained terminal snapshot as safe plain text across XML, JSON, and Markdown. It removes ANSI styling and interprets common carriage-return, backspace, cursor, and erase-line redraws. Internal newlines are retained, while terminal-end padding is removed. This normalization cannot recover scrollback or earlier output absent from Atuin's stored snapshot.
