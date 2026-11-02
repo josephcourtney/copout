@@ -120,9 +120,8 @@ def inspect(
             issues.append(Issue("partial", "output-unavailable", index))
         elif source["state"] != "captured":
             issues.append(Issue("error", "unknown-output-state", index))
-        if (
-            (source["state"] == "captured" and source["completeness"] == "unavailable")
-            or (source["state"] == "unavailable" and source["completeness"] != "unavailable")
+        if (source["state"] == "captured" and source["completeness"] == "unavailable") or (
+            source["state"] == "unavailable" and source["completeness"] != "unavailable"
         ):
             issues.append(Issue("error", "invalid-completeness-state", index))
         if source["completeness"] == "incomplete" or source["truncated"] is True:

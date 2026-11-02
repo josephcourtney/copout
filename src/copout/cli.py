@@ -376,9 +376,7 @@ def cli(
     ] = False,
     diagnostics_verbose: Annotated[
         bool,
-        typer.Option(
-            "--diagnostics-verbose", help="Print per-command capture sizes and findings."
-        ),
+        typer.Option("--diagnostics-verbose", help="Print per-command capture sizes and findings."),
     ] = False,
     check: Annotated[
         bool, typer.Option("--check", help="Reject missing or incomplete captures (exit 4).")
@@ -742,9 +740,7 @@ def pick_command(
     ] = False,
     diagnostics_verbose: Annotated[
         bool,
-        typer.Option(
-            "--diagnostics-verbose", help="Print per-command capture sizes and findings."
-        ),
+        typer.Option("--diagnostics-verbose", help="Print per-command capture sizes and findings."),
     ] = False,
     check: Annotated[
         bool, typer.Option("--check", help="Reject missing or incomplete captures (exit 4).")
