@@ -22,7 +22,8 @@ help:
     '  just check                    Run non-mutating lint, format, typecheck, and tests' \
     '  just build                    Build wheel and sdist' \
     '  just typer-compat             Test CLI across isolated Typer versions' \
-    '  just benchmark-context        Time context capture versus --no-context'
+    '  just benchmark-context        Time context capture versus --no-context' \
+    '  just kitty-theme-check        Verify picker in isolated light/dark Kitty windows'
 
 setup:
   {{UV}} sync
@@ -77,3 +78,6 @@ benchmark-context:
 clean:
   rm -rf .pytest_cache .ruff_cache .coverage htmlcov dist build
   find . -name '__pycache__' -type d -prune -exec rm -rf '{}' +
+
+kitty-theme-check out="/tmp/copout-picker-themes":
+  {{PYTHON}} scripts/qualify_picker_themes.py --out '{{out}}'
