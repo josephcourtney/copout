@@ -148,7 +148,7 @@ def test_picker_remains_a_single_compact_list_in_wide_terminal() -> None:
 def test_picker_uses_terminal_ansi_theme() -> None:
     app = picker.CommandPicker([HistoryEntry("1", "example")])
 
-    assert app.theme == "textual-ansi"
+    assert app.theme == "ansi-dark"
     assert app.ansi_color is True
     assert app.native_ansi_color is True
 
@@ -159,7 +159,7 @@ def test_picker_ansi_theme_keeps_selection_usable() -> None:
             [HistoryEntry("2", "recent"), HistoryEntry("1", "older")]
         )
         async with app.run_test(size=(80, 12)) as pilot:
-            assert app.current_theme.name == "textual-ansi"
+            assert app.current_theme.name == "ansi-dark"
             assert app.native_ansi_color
             choices = app.query_one("#commands", SelectionList)
             await pilot.press("down", "space", "enter")
