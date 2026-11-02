@@ -58,7 +58,7 @@ class DaemonInfo:
     healthy: bool
     version: str
     pid: int
-    protocol: int
+    protocol: int | None
 
 
 def _duration_seconds(text: str | None) -> float | None:
