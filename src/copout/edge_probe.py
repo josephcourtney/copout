@@ -63,9 +63,16 @@ def analyze_edge_cases(payload: dict[str, Any]) -> dict[str, Any]:
         expected = expected_lines(case)
         metadata = {
             key: output[key]
-            for key in ("completeness", "truncated", "exit_capture_complete",
-                        "observed_bytes", "captured_bytes", "presented_bytes",
-                        "presentation_truncated", "coverage_warning")
+            for key in (
+                "completeness",
+                "truncated",
+                "exit_capture_complete",
+                "observed_bytes",
+                "captured_bytes",
+                "presented_bytes",
+                "presentation_truncated",
+                "coverage_warning",
+            )
             if key in output
         }
         intact = (
@@ -85,13 +92,10 @@ def analyze_edge_cases(payload: dict[str, Any]) -> dict[str, Any]:
 
     rapid_a = by_case["rapid-a"]
     rapid_b = by_case["rapid-b"]
-    rapid_order = (
-        len(rapid_a) == len(rapid_b) == 1
-        and runs.index(rapid_a[0]) < runs.index(rapid_b[0])
+    rapid_order = len(rapid_a) == len(rapid_b) == 1 and runs.index(rapid_a[0]) < runs.index(
+        rapid_b[0]
     )
-    passed = rapid_order and all(
-        result["status"] == "probe-intact" for result in results.values()
-    )
+    passed = rapid_order and all(result["status"] == "probe-intact" for result in results.values())
     return {
         "classification": "edge-probes-intact" if passed else "edge-probe-anomaly",
         "probe_intact": passed,
@@ -100,8 +104,8 @@ def analyze_edge_cases(payload: dict[str, Any]) -> dict[str, Any]:
         "interpretation": (
             "All five known-output probes survived retrieval and presentation; "
             "this does not establish general PTY transcript completeness."
-            if passed else
-            "An anomaly was observed in a known-output probe. Compare the "
+            if passed
+            else "An anomaly was observed in a known-output probe. Compare the "
             "Atuin retained snapshot and lower-layer evidence before attribution."
         ),
     }

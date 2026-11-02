@@ -155,9 +155,7 @@ def test_picker_uses_terminal_ansi_theme() -> None:
 
 def test_picker_ansi_theme_keeps_selection_usable() -> None:
     async def exercise() -> None:
-        app = picker.CommandPicker(
-            [HistoryEntry("2", "recent"), HistoryEntry("1", "older")]
-        )
+        app = picker.CommandPicker([HistoryEntry("2", "recent"), HistoryEntry("1", "older")])
         async with app.run_test(size=(80, 12)) as pilot:
             assert app.current_theme.name == "ansi-dark"
             assert app.native_ansi_color

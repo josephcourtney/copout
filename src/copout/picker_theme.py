@@ -15,7 +15,9 @@ import tty
 from typing import BinaryIO
 
 _QUERY = b"\x1b]11;?\x1b\\"
-_RESPONSE = re.compile(rb"\x1b\]11;rgb:([0-9a-fA-F]{1,4})/([0-9a-fA-F]{1,4})/([0-9a-fA-F]{1,4})(?:\x07|\x1b\\)")
+_RESPONSE = re.compile(
+    rb"\x1b\]11;rgb:([0-9a-fA-F]{1,4})/([0-9a-fA-F]{1,4})/([0-9a-fA-F]{1,4})(?:\x07|\x1b\\)"
+)
 _MAX_RESPONSE = 128
 _TIMEOUT = 0.15
 

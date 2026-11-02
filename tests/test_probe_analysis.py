@@ -1,23 +1,23 @@
 from __future__ import annotations
 
+import pytest
+
 from copout.probe_analysis import analyze_probe
 
 
 def _capture(*, missing: int | None = None, **metadata: object) -> dict:
     lines = ["__COPOUT_PROBE_BEGIN__"]
-    lines.extend(
-        f"probe {i:04d} {i:072d}"
-        for i in range(1, 2401)
-        if i != missing
-    )
+    lines.extend(f"probe {i:04d} {i:072d}" for i in range(1, 2401) if i != missing)
     lines.extend(["__COPOUT_STDERR__", "colored", "ready", "__COPOUT_PROBE_END__"])
     return {
         "version": 9,
-        "runs": [{
-            "history_id": "probe-id",
-            "command": "bash scripts/probe_output.sh",
-            "output": {"state": "captured", "text": "\n".join(lines), **metadata},
-        }],
+        "runs": [
+            {
+                "history_id": "probe-id",
+                "command": "bash scripts/probe_output.sh",
+                "output": {"state": "captured", "text": "\n".join(lines), **metadata},
+            }
+        ],
     }
 
 
@@ -61,9 +61,7 @@ def test_missing_end_marker_is_detected() -> None:
 def test_duplicate_probe_line_is_detected() -> None:
     payload = _capture()
     text = payload["runs"][0]["output"]["text"]
-    payload["runs"][0]["output"]["text"] = text.replace(
-        "probe 0002 000000", "probe 0001 000000", 1
-    )
+    payload["runs"][0]["output"]["text"] = text.replace("probe 0002 000000", "probe 0001 000000", 1)
     result = analyze_probe(payload)
     assert result["probe_intact"] is False
     assert result["missing_line_count"] == 1
@@ -71,15 +69,17 @@ def test_duplicate_probe_line_is_detected() -> None:
 
 def test_multi_run_capture_chooses_probe_by_command() -> None:
     payload = _capture()
-    payload["runs"].insert(0, {
-        "command": "git status",
-        "output": {"text": "clean", "state": "captured"},
-    })
+    payload["runs"].insert(
+        0,
+        {
+            "command": "git status",
+            "output": {"text": "clean", "state": "captured"},
+        },
+    )
     assert analyze_probe(payload)["probe_intact"]
 
 
 def test_invalid_probe_selection_is_explicit() -> None:
-    import pytest
 
     with pytest.raises(ValueError, match="exactly one probe"):
         analyze_probe({"runs": [{"command": "git status"}]})

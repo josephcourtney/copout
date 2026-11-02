@@ -22,9 +22,9 @@ def analyze_probe(capture: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("expected a Copout JSON envelope containing runs")
     # Search by the command, not by run index: Copout may be asked for several runs.
     matches = [
-        run for run in runs
-        if isinstance(run, dict)
-        and "scripts/probe_output.sh" in str(run.get("command", ""))
+        run
+        for run in runs
+        if isinstance(run, dict) and "scripts/probe_output.sh" in str(run.get("command", ""))
     ]
     if len(matches) != 1:
         raise ValueError(f"expected exactly one probe command, found {len(matches)}")
@@ -97,18 +97,25 @@ def analyze_probe(capture: dict[str, Any]) -> dict[str, Any]:
         "capture_metadata": {
             key: output.get(key)
             for key in (
-                "state", "source", "completeness", "truncated",
-                "exit_capture_complete", "observed_bytes", "captured_bytes",
-                "presented_bytes", "presentation_truncated",
-                "presentation_omitted_bytes", "coverage_warning",
+                "state",
+                "source",
+                "completeness",
+                "truncated",
+                "exit_capture_complete",
+                "observed_bytes",
+                "captured_bytes",
+                "presented_bytes",
+                "presentation_truncated",
+                "presentation_omitted_bytes",
+                "coverage_warning",
             )
             if key in output
         },
         "interpretation": (
             "The known probe is intact in the retrieved and presented output; "
             "this is not proof of general transcript completeness."
-            if pass_probe else
-            "This analysis cannot determine whether missing data arose in the "
+            if pass_probe
+            else "This analysis cannot determine whether missing data arose in the "
             "Atuin PTY capture, retained rendering, daemon retrieval, or Copout "
             "normalization without comparing lower-layer evidence."
         ),
